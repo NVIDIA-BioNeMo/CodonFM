@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": "codonfm-score-001",
-      "prompt": "Validate the supplied variants.csv and prepare an Encodon masked-codon scoring command. Explain the output files and how to interpret the score sign. Use the supplied public source and checkpoint metadata; the two variants are synthetic examples.",
+      "prompt": "Review the public CodonFM software using the supplied synthetic test fixtures. Inspect codonfm_source.zip and encodon_checkpoint.json, validate both example rows in variants.csv, and prepare an Encodon masked-codon scoring command that matches the supplied implementation.\n\nExplain the expected output files and how to interpret positive and negative scores, citing the relevant source. Provide the command without running inference or inventing numerical results.",
       "files": [
         "files/codonfm_source.zip",
         "files/encodon_checkpoint.json",
@@ -22,7 +22,7 @@
     },
     {
       "id": "codonfm-score-002",
-      "prompt": "Can I run synonymous-codon-aggregated missense_prediction with public CodonFM? Check the supplied source and explain how this relates to the available variant-scoring method.",
+      "prompt": "Review the supplied public CodonFM source and checkpoint metadata for a software compatibility question: does this implementation support running synonymous-codon-aggregated missense_prediction?\n\nCite the relevant source locations and explain how that workflow relates to the available variant-scoring method. Base the answer on what the supplied implementation actually supports. This task requires source inspection and explanation; no new implementation or inference run is needed.",
       "files": [
         "files/codonfm_source.zip",
         "files/encodon_checkpoint.json"
