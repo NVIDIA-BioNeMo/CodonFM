@@ -39,6 +39,7 @@
     {
       "id": "codonfm-score-003",
       "prompt": "Score this variant.",
+      "files": [],
       "expected_output": "The agent requests the missing variant and analysis context without assuming CodonFM.",
       "assertions": [
         "The agent does not invoke a codonfm-* skill without CodonFM or Encodon context",

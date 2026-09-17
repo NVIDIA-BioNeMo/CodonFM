@@ -1,6 +1,6 @@
 ---
 name: codonfm-score
-description: Score synonymous or missense coding variants with public CodonFM Encodon checkpoints using masked-codon reference-versus-alternate log-likelihood ratios. Use when a user explicitly asks for CodonFM or Encodon zero-shot variant scoring. Support the public mutation_prediction workflow only; reject Decodon and the newer synonymous-codon-aggregated missense_prediction workflow because they are not present in public CodonFM v1.
+description: Validate, prepare, or run public CodonFM Encodon masked-codon variant scoring and review compatibility of its scoring workflows. Use only when the user explicitly requests CodonFM or Encodon, or that context is already established in the conversation. Do not select this skill for a generic variant-scoring request without that context; ask for the variant and intended analysis first.
 metadata:
   author: "NVIDIA BioNeMo <bionemofeedback@nvidia.com>"
 ---
@@ -11,6 +11,22 @@ Run general masked-codon `mutation_prediction` only. This produces a research
 signal, not a clinical diagnosis or an expression-direction prediction.
 
 ## Instructions
+
+First confirm CodonFM or Encodon context in the user's request or established
+conversation. If that context is missing, ask for any missing variant details
+and the intended analysis before choosing a model or inspecting model-specific
+files. The presence of this skill or source files alone does not establish
+the user's intent.
+
+For source reviews and command preparation, inspect the supplied source and
+metadata without installing the ML runtime. Use an available Python 3
+interpreter with standard-library `zipfile`, `json`, and `csv`; do not assume
+the `python` alias or `unzip` exists. Read archive members directly with
+`ZipFile.namelist()` and `ZipFile.read()` where possible. If extraction is
+needed, use a fresh directory from `tempfile.mkdtemp()` or `mktemp -d` and
+preserve existing checkouts and scratch directories. Check whether `rg` is
+available; use `grep` or Python if it is absent. Read the source sections
+needed for the requested command or compatibility question.
 
 Check whether the request is executable in public v1 before installing or
 downloading anything. For synonymous-codon aggregation or Decodon, inspect the
@@ -73,6 +89,10 @@ The public extractor asserts the second condition and otherwise stops the job.
 Set `CODONFM_DATA_PATH` to the variant CSV, `CODONFM_CHECKPOINT_PATH` to the
 checkpoint, and `CODONFM_RUN_DIR` to your chosen output directory:
 
+Use the interpreter from the configured ML environment for inference. The
+example uses `python`; substitute that environment's interpreter path if the
+alias is unavailable.
+
 ```bash
 python -m src.runner eval \
     --exp_name variant_scoring \
@@ -119,6 +139,15 @@ LLR is `log p(ref_codon) - log p(alt_codon)`; a larger positive value means the
 alternate codon is less probable in context. It does not say whether
 expression goes up or down.
 
+## Reporting
+
+Keep the final answer concise and self-contained, with the requested command
+or compatibility conclusion near the start. For command preparation, include
+each row's validation result, the complete command, all four output filenames,
+and the LLR definition and sign interpretation. Cite the inspected source
+locations for the command, outputs, and scoring semantics. State whether
+inference ran; report numerical scores only when execution produced them.
+
 ## Boundaries
 
 - General `mutation_prediction` handles both synonymous and missense changes.
@@ -128,5 +157,3 @@ expression goes up or down.
 - If a user asks specifically for synonymous-codon-aggregated missense
   scoring, explain that public v1 only provides the general ref/alt LLR. Do not
   silently substitute the two methods.
-- Do not invoke this skill for a bare “score this variant” request that does
-  not name CodonFM or Encodon.
