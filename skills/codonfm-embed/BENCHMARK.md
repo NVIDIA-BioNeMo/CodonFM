@@ -1,17 +1,19 @@
 # Skill Benchmark: codonfm-embed
 
-> **Overall verdict: NEUTRAL — One or more dimensions remain below PASS**
+> ✅ **Overall verdict: PASS — Recommended for publication**
 
-Live evaluation did not show a material gain or regression. Collect more evidence or improve the skill before making a publication decision.
+## Publication Recommendation
+
+Recommended for publication based on the completed evaluation evidence in this report.
 
 ## Evaluation Metadata
 
 - Skill: `codonfm-embed`
-- Evaluation date: 2026-10-02
+- Evaluation date: 2026-10-07
 - Evaluator version: `1.5.6`
 - Agents: Claude Code (`aws/anthropic/bedrock-claude-opus-4-8`), Codex (`openai/openai/gpt-5.5`)
-- Tasks: 2 evaluation tasks (2 positive)
-- Dataset digest: `sha256:13e6b2a6ffaa03dba4985cf78c69ce0dfef33331f5fba362890e08c6cf187db2` (skill-evaluator-dataset-snapshot/1)
+- Tasks: 4 evaluation tasks (4 positive)
+- Dataset digest: `sha256:8ef619d6a9074d8b7fdc6224f220bb79aad6e37e2222f3290580290b7a6afbeb` (skill-evaluator-dataset-snapshot/1)
 - Attempts per task: 1
 - Environment: `k8s-sandbox`
 - Tier 2 evidence: required for publication
@@ -33,12 +35,12 @@ The three-tier evaluation checks whether the skill:
 
 | Measure | Claude Code (Baseline → Skill Uplift) | Codex (Baseline → Skill Uplift) |
 |---|---:|---:|
-| Overall | 91.5% — baseline ran, but no comparable score was available; uplift unavailable | 78.0% — baseline ran, but no comparable score was available; uplift unavailable |
-| Security | 100.0% → 100.0% (±0.0 points) | 0.0% → 50.0% (+50.0 points) |
+| Overall | 96.1% — baseline ran, but no comparable score was available; uplift unavailable | 93.4% — baseline ran, but no comparable score was available; uplift unavailable |
+| Security | 75.0% → 100.0% (+25.0 points) | 75.0% → 100.0% (+25.0 points) |
 | Correctness | 100.0% → 100.0% (±0.0 points) | 100.0% → 100.0% (±0.0 points) |
-| Discoverability | 92.5% — baseline ran, but no comparable score was available; uplift unavailable | 75.0% — baseline ran, but no comparable score was available; uplift unavailable |
-| Effectiveness | 100.0% → 81.3% (-18.7 points) | 100.0% → 81.3% (-18.7 points) |
-| Efficiency | 83.6% — baseline ran, but no comparable score was available; uplift unavailable | 83.9% — baseline ran, but no comparable score was available; uplift unavailable |
+| Discoverability | 96.3% — baseline ran, but no comparable score was available; uplift unavailable | 86.3% — baseline ran, but no comparable score was available; uplift unavailable |
+| Effectiveness | 85.6% → 90.6% (+5.0 points) | 98.8% → 93.8% (-5.0 points) |
+| Efficiency | 93.6% — baseline ran, but no comparable score was available; uplift unavailable | 86.9% — baseline ran, but no comparable score was available; uplift unavailable |
 
 **How to read this table:** baseline is the same task attempted without the target skill. Scores are rounded to one decimal; threshold-adjacent values use additional precision so their displayed band matches the verdict. Uplift is derived from those displayed scores and shown in percentage points.
 
@@ -50,13 +52,17 @@ Actual Tier 3 execution usage is reported for every observed agent/case pair and
 
 | Agent | Dataset case | With skill | Without skill | Delta | Change | Coverage |
 |---|---|---:|---:|---:|---:|---|
-| claude-code | All cases | 1,552,466 | 2,540,319 | -987,853 | -38.89% | skill 2/2; base 2/2 |
-| claude-code | codonfm-embed-001 | 1,191,884 | 1,670,815 | -478,931 | -28.66% | skill 1/1; base 1/1 |
-| claude-code | codonfm-embed-002 | 360,582 | 869,504 | -508,922 | -58.53% | skill 1/1; base 1/1 |
-| codex | All cases | 756,363 | 747,441 | +8,922 | +1.19% | skill 2/2; base 2/2 |
-| codex | codonfm-embed-001 | 347,201 | 309,716 | +37,485 | +12.10% | skill 1/1; base 1/1 |
-| codex | codonfm-embed-002 | 409,162 | 437,725 | -28,563 | -6.53% | skill 1/1; base 1/1 |
-| ALL AGENTS | Dataset aggregate | 2,308,829 | 3,287,760 | -978,931 | -29.78% | skill 4/4; base 4/4 |
+| claude-code | All cases | 1,152,349 | 5,695,914 | -4,543,565 | -79.77% | skill 4/4; base 4/4 |
+| claude-code | codonfm-embed-001 | 544,672 | 1,934,434 | -1,389,762 | -71.84% | skill 1/1; base 1/1 |
+| claude-code | codonfm-embed-002 | 243,222 | 950,364 | -707,142 | -74.41% | skill 1/1; base 1/1 |
+| claude-code | codonfm-embed-003 | 265,873 | 2,038,952 | -1,773,079 | -86.96% | skill 1/1; base 1/1 |
+| claude-code | codonfm-embed-004 | 98,582 | 772,164 | -673,582 | -87.23% | skill 1/1; base 1/1 |
+| codex | All cases | 487,427 | 1,838,975 | -1,351,548 | -73.49% | skill 4/4; base 4/4 |
+| codex | codonfm-embed-001 | 106,660 | 518,881 | -412,221 | -79.44% | skill 1/1; base 1/1 |
+| codex | codonfm-embed-002 | 159,116 | 322,872 | -163,756 | -50.72% | skill 1/1; base 1/1 |
+| codex | codonfm-embed-003 | 157,215 | 924,873 | -767,658 | -83.00% | skill 1/1; base 1/1 |
+| codex | codonfm-embed-004 | 64,436 | 72,349 | -7,913 | -10.94% | skill 1/1; base 1/1 |
+| ALL AGENTS | Dataset aggregate | 1,639,776 | 7,534,889 | -5,895,113 | -78.24% | skill 8/8; base 8/8 |
 
 Prompt tokens include cached reads, so total tokens are `prompt + completion` (cached is not added twice). The Efficiency score uses `(prompt - cached) + completion`. N/A means the relevant trajectory counters were not available; coverage is never estimated.
 
@@ -64,21 +70,18 @@ Prompt tokens include cached reads, so total tokens are `prompt + completion` (c
 
 | Tier | Purpose | Status | Evidence |
 |---|---|---|---|
-| Tier 1 | Static validation | **PASSED WITH OBSERVATIONS** | 11 validator(s); 7 finding(s) |
+| Tier 1 | Static validation | **PASSED WITH OBSERVATIONS** | 11 validator(s); 3 finding(s) |
 | Tier 2 | Semantic deduplication | **PASSED** | 2 validator(s); 0 finding(s) |
-| Tier 3 | Live agent evaluation | **NEUTRAL** | 2 agent(s); 2 task(s) |
+| Tier 3 | Live agent evaluation | **PASS** | 2 agent(s); 4 task(s) |
 
 ## Findings and Observations
 
 <details>
 <summary>Show detailed findings and successful checks</summary>
 
-- **MEDIUM** QUALITY/quality_correctness: SKILL_SPEC recommended field missing: 'metadata.tags' (`skills/codonfm-embed/SKILL.md`)
-- **LOW** QUALITY/quality_discoverability: Description very long (373 chars, recommend 50-150) (`skills/codonfm-embed/SKILL.md`)
-- **LOW** QUALITY/quality_discoverability: No '## Purpose' section (`skills/codonfm-embed/SKILL.md`)
-- **LOW** QUALITY/quality_reliability: No prerequisites/requirements documented (`skills/codonfm-embed/SKILL.md`)
-- **LOW** QUALITY/quality_reliability: No limitations documented (`skills/codonfm-embed/SKILL.md`)
-- 2 additional finding(s) are available in the full evaluation artifacts.
+- **MEDIUM** QUALITY/quality_correctness: Instructions don't mention 'run_script' (`skills/codonfm-embed/SKILL.md`)
+- **MEDIUM** SECURITY/Unknown (LP3): MCP Least Privilege: Without declared permissions the skill's intent is opaque and cannot be validated. (`SKILL.md:1`)
+- **LOW** SCRIPT_LINT/magic_numbers: validate_inputs.py contains magic numbers (`skills/codonfm-embed/scripts/validate_inputs.py`)
 
 </details>
 

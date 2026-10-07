@@ -9,7 +9,7 @@ NVIDIA <br>
 ### License/Terms of Use: <br>
 Apache 2.0 <br>
 ## Use Case: <br>
-Developers and computational biologists fine-tune CodonFM Encodon checkpoints on labeled coding-sequence or variant data for sequence-level regression or classification. <br>
+Developers and computational biologists use this skill to fine-tune NVIDIA CodonFM Encodon foundation models on labeled coding-sequence or coding-variant datasets for regression or classification tasks. <br>
 
 ### Deployment Geography for Use: <br>
 Global <br>
@@ -28,10 +28,9 @@ Mitigation: Review and scan skill before deployment. <br>
 - [NV-CodonFM-Encodon-80M-v1 (Hugging Face)](https://huggingface.co/nvidia/NV-CodonFM-Encodon-80M-v1) <br>
 - [NV-CodonFM-Encodon-600M-v1 (Hugging Face)](https://huggingface.co/nvidia/NV-CodonFM-Encodon-600M-v1) <br>
 - [NV-CodonFM-Encodon-1B-v1 (Hugging Face)](https://huggingface.co/nvidia/NV-CodonFM-Encodon-1B-v1) <br>
-- [NV-CodonFM-Encodon-Cdwt-1B-v1 (Hugging Face)](https://huggingface.co/nvidia/NV-CodonFM-Encodon-Cdwt-1B-v1) <br>
-- [CodonFM Encodon on NGC](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/nv_codonfm_encodon) <br>
+- [NV-CodonFM-Encodon on NGC](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/nv_codonfm_encodon) <br>
+- [CenikLab TE Classic ML Data](https://github.com/CenikLab/TE_classic_ML/tree/main/data) <br>
 - [NVIDIA Deep Bio Research](https://research.nvidia.com/labs/dbr) <br>
-- [CenikLab/TE_classic_ML (upstream RiboNN data)](https://github.com/CenikLab/TE_classic_ML/tree/main/data) <br>
 
 
 ## Skill Output: <br>
@@ -47,39 +46,39 @@ Mitigation: Review and scan skill before deployment. <br>
 
 
 ## Evaluation Tasks: <br>
-Evaluated against 3 internal evaluation tasks (3 positive) across 2 agents, each attempt in an isolated sandbox pod. <br>
+Evaluated against 3 positive evaluation tasks in isolated k8s-sandbox pods, covering LoRA fine-tuning preparation, variant classification, and data preparation workflows. <br>
 
 ## Evaluation Metrics Used: <br>
 Reported benchmark dimensions: <br>
-- Security: Is it safe to use? Checks for unsafe operations, secret leakage, and unauthorized access. <br>
-- Correctness: Is the answer correct? Final-answer correctness against the reference answer. <br>
-- Discoverability: Was the right skill loaded when needed? Whether the expected skill was selected, decoys were avoided, and the workflow executed. <br>
-- Effectiveness: Did the skill help complete the task? Equal-weight mean of goal completion and expected workflow adherence. <br>
-- Efficiency: Did it avoid wasted tool calls and token usage? 50% tool-call productivity and 50% token efficiency. <br>
+- Security: Whether the skill is safe to use: checks for unsafe operations, secret leakage, and unauthorized access. <br>
+- Correctness: Whether the final answer is correct against the reference answer. <br>
+- Discoverability: Whether the right skill was loaded when needed: skill selection, decoy avoidance, and workflow execution. <br>
+- Effectiveness: Whether the skill helped complete the task: goal completion (50%) and expected workflow adherence (50%). <br>
+- Efficiency: Whether wasted tool calls and token usage were avoided: tool-call productivity (50%) and token efficiency (50%). <br>
 
 Underlying evaluation signals used in this run: <br>
-- `security`: Unsafe operations, secret leakage, and unauthorized access. <br>
-- `skill_execution`: Whether the expected skill was selected, decoys were avoided, and the workflow executed. <br>
-- `skill_efficiency`: Tool-call productivity (routing scored under Discoverability). <br>
+- `security`: Checks for unsafe operations, secret leakage, and unauthorized access. <br>
 - `accuracy`: Final-answer correctness against the reference answer. <br>
+- `skill_execution`: Whether the expected skill was selected, decoys were avoided, and the workflow executed. <br>
 - `goal_accuracy`: Whether the user's goal was achieved. <br>
 - `behavior_check`: Whether the expected workflow behavior was followed. <br>
-- `token_efficiency`: Actual uncached prompt plus completion token usage. <br>
+- `skill_efficiency`: Tool-call productivity (legacy wire id; routing scored under Discoverability). <br>
+- `token_efficiency`: Actual uncached prompt plus completion usage. <br>
 
 
 
 ## Evaluation Results: <br>
 | Measure | Claude Code (Baseline → Skill Uplift) | Codex (Baseline → Skill Uplift) |
 |---|---:|---:|
-| Overall | 89.9% | 87.9% |
-| Security | 100.0% → 100.0% (±0.0 pts) | 33.3% → 66.7% (+33.4 pts) |
-| Correctness | 100.0% → 100.0% (±0.0 pts) | 100.0% → 100.0% (±0.0 pts) |
-| Discoverability | 87.7% | 91.0% |
-| Effectiveness | 83.3% → 80.0% (-3.3 pts) | 86.7% → 93.3% (+6.6 pts) |
-| Efficiency | 82.0% | 88.5% |
+| Overall | 85.0% | 82.8% |
+| Security | 100.0% → 66.7% (-33.3 points) | 33.3% → 66.7% (+33.4 points) |
+| Correctness | 100.0% → 100.0% (±0.0 points) | 100.0% → 100.0% (±0.0 points) |
+| Discoverability | 91.7% | 76.7% |
+| Effectiveness | 86.7% → 86.7% (±0.0 points) | 96.7% → 90.0% (-6.7 points) |
+| Efficiency | 80.0% | 80.7% |
 
 ## Skill Version(s): <br>
-29194e8 (source: git SHA, committed 2026-09-18) <br>
+be43117 (source: git SHA, committed 2026-10-07) <br>
 
 ## Ethical Considerations: <br>
 NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications. When downloaded or used in accordance with our terms of service, developers should work with their internal team to ensure this skill meets requirements for the relevant industry and use case and addresses unforeseen product misuse. <br>

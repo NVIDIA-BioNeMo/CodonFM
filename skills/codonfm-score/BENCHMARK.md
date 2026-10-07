@@ -9,7 +9,7 @@ Recommended for publication based on the completed evaluation evidence in this r
 ## Evaluation Metadata
 
 - Skill: `codonfm-score`
-- Evaluation date: 2026-10-02
+- Evaluation date: 2026-10-07
 - Evaluator version: `1.5.6`
 - Agents: Claude Code (`aws/anthropic/bedrock-claude-opus-5`), Codex (`openai/openai/gpt-5.5`)
 - Tasks: 3 evaluation tasks (2 positive, 1 negative)
@@ -35,12 +35,12 @@ The three-tier evaluation checks whether the skill:
 
 | Measure | Claude Code (Baseline → Skill Uplift) | Codex (Baseline → Skill Uplift) |
 |---|---:|---:|
-| Overall | 88.8% — baseline ran, but no comparable score was available; uplift unavailable | 91.6% — baseline ran, but no comparable score was available; uplift unavailable |
-| Security | 100.0% → 66.7% (-33.3 points) | 66.7% → 100.0% (+33.3 points) |
+| Overall | 96.1% — baseline ran, but no comparable score was available; uplift unavailable | 84.8% — baseline ran, but no comparable score was available; uplift unavailable |
+| Security | 100.0% → 100.0% (±0.0 points) | 33.3% → 66.7% (+33.4 points) |
 | Correctness | 100.0% → 100.0% (±0.0 points) | 100.0% → 100.0% (±0.0 points) |
-| Discoverability | 97.5% — baseline ran, but no comparable score was available; uplift unavailable | 75.0% — baseline ran, but no comparable score was available; uplift unavailable |
-| Effectiveness | 96.7% → 90.0% (-6.7 points) | 93.3% → 93.3% (±0.0 points) |
-| Efficiency | 90.0% — baseline ran, but no comparable score was available; uplift unavailable | 89.6% — baseline ran, but no comparable score was available; uplift unavailable |
+| Discoverability | 95.0% — baseline ran, but no comparable score was available; uplift unavailable | 80.0% — baseline ran, but no comparable score was available; uplift unavailable |
+| Effectiveness | 90.0% → 93.3% (+3.3 points) | 90.0% → 96.7% (+6.7 points) |
+| Efficiency | 92.1% — baseline ran, but no comparable score was available; uplift unavailable | 80.7% — baseline ran, but no comparable score was available; uplift unavailable |
 
 **How to read this table:** baseline is the same task attempted without the target skill. Scores are rounded to one decimal; threshold-adjacent values use additional precision so their displayed band matches the verdict. Uplift is derived from those displayed scores and shown in percentage points.
 
@@ -54,15 +54,15 @@ Actual Tier 3 execution usage is reported for every observed agent/case pair and
 
 | Agent | Dataset case | With skill | Without skill | Delta | Change | Coverage |
 |---|---|---:|---:|---:|---:|---|
-| claude-code | All cases | 1,540,091 | 2,144,581 | -604,490 | -28.19% | skill 3/3; base 3/3 |
-| claude-code | codonfm-score-001 | 713,780 | 1,298,851 | -585,071 | -45.05% | skill 1/1; base 1/1 |
-| claude-code | codonfm-score-002 | 672,716 | 726,625 | -53,909 | -7.42% | skill 1/1; base 1/1 |
-| claude-code | codonfm-score-003 | 153,595 | 119,105 | +34,490 | +28.96% | skill 1/1; base 1/1 |
-| codex | All cases | 921,033 | 1,390,032 | -468,999 | -33.74% | skill 3/3; base 3/3 |
-| codex | codonfm-score-001 | 390,238 | 816,264 | -426,026 | -52.19% | skill 1/1; base 1/1 |
-| codex | codonfm-score-002 | 517,306 | 518,092 | -786 | -0.15% | skill 1/1; base 1/1 |
-| codex | codonfm-score-003 | 13,489 | 55,676 | -42,187 | -75.77% | skill 1/1; base 1/1 |
-| ALL AGENTS | Dataset aggregate | 2,461,124 | 3,534,613 | -1,073,489 | -30.37% | skill 6/6; base 6/6 |
+| claude-code | All cases | 1,308,984 | 3,855,619 | -2,546,635 | -66.05% | skill 3/3; base 3/3 |
+| claude-code | codonfm-score-001 | 677,690 | 2,757,266 | -2,079,576 | -75.42% | skill 1/1; base 1/1 |
+| claude-code | codonfm-score-002 | 457,608 | 884,998 | -427,390 | -48.29% | skill 1/1; base 1/1 |
+| claude-code | codonfm-score-003 | 173,686 | 213,355 | -39,669 | -18.59% | skill 1/1; base 1/1 |
+| codex | All cases | 1,491,127 | 1,204,536 | +286,591 | +23.79% | skill 3/3; base 3/3 |
+| codex | codonfm-score-001 | 477,556 | 566,528 | -88,972 | -15.70% | skill 1/1; base 1/1 |
+| codex | codonfm-score-002 | 1,000,069 | 624,731 | +375,338 | +60.08% | skill 1/1; base 1/1 |
+| codex | codonfm-score-003 | 13,502 | 13,277 | +225 | +1.69% | skill 1/1; base 1/1 |
+| ALL AGENTS | Dataset aggregate | 2,800,111 | 5,060,155 | -2,260,044 | -44.66% | skill 6/6; base 6/6 |
 
 Prompt tokens include cached reads, so total tokens are `prompt + completion` (cached is not added twice). The Efficiency score uses `(prompt - cached) + completion`. N/A means the relevant trajectory counters were not available; coverage is never estimated.
 

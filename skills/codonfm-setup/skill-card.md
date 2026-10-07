@@ -9,7 +9,7 @@ NVIDIA <br>
 ### License/Terms of Use: <br>
 Apache 2.0 <br>
 ## Use Case: <br>
-Developers and engineers setting up the CodonFM development environment, building or launching the development container, configuring data and checkpoint mounts, verifying GPU access, and downloading public Encodon model weights. <br>
+Developers and computational biologists who need to set up the CodonFM development environment, build or launch the development container, configure local data and checkpoint mounts, verify GPU access, or download public Encodon 80M, 600M, 1B, or Cdwt-1B weights. <br>
 
 ### Deployment Geography for Use: <br>
 Global <br>
@@ -25,13 +25,15 @@ Risk: Review before execution as proposals could introduce incorrect or misleadi
 Mitigation: Review and scan skill before deployment. <br>
 
 ## Reference(s): <br>
-- [NV-CodonFM-Encodon-80M-v1 (Hugging Face)](https://huggingface.co/nvidia/NV-CodonFM-Encodon-80M-v1) <br>
-- [NV-CodonFM-Encodon-600M-v1 (Hugging Face)](https://huggingface.co/nvidia/NV-CodonFM-Encodon-600M-v1) <br>
-- [NV-CodonFM-Encodon-1B-v1 (Hugging Face)](https://huggingface.co/nvidia/NV-CodonFM-Encodon-1B-v1) <br>
-- [NV-CodonFM-Encodon-Cdwt-1B-v1 (Hugging Face)](https://huggingface.co/nvidia/NV-CodonFM-Encodon-Cdwt-1B-v1) <br>
-- [NV CodonFM Encodon (NGC Catalog)](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/nv_codonfm_encodon) <br>
+- [NV-CodonFM-Encodon-80M-v1](https://huggingface.co/nvidia/NV-CodonFM-Encodon-80M-v1) <br>
+- [NV-CodonFM-Encodon-600M-v1](https://huggingface.co/nvidia/NV-CodonFM-Encodon-600M-v1) <br>
+- [NV-CodonFM-Encodon-1B-v1](https://huggingface.co/nvidia/NV-CodonFM-Encodon-1B-v1) <br>
+- [NV-CodonFM-Encodon-Cdwt-1B-v1](https://huggingface.co/nvidia/NV-CodonFM-Encodon-Cdwt-1B-v1) <br>
+- [NGC CodonFM Encodon Catalog](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/nv_codonfm_encodon) <br>
+- [HuggingFace Hub CLI Documentation](https://huggingface.co/docs/huggingface_hub/en/guides/cli) <br>
 - [NVIDIA CUDA Compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html) <br>
-- [NVIDIA Deep Bio Research](https://research.nvidia.com/labs/dbr) <br>
+- [PyTorch 24.10 Release Notes](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-24-10.html#driver-requirements) <br>
+- [NVIDIA Deep Biology Research](https://research.nvidia.com/labs/dbr) <br>
 
 
 ## Skill Output: <br>
@@ -47,39 +49,39 @@ Mitigation: Review and scan skill before deployment. <br>
 
 
 ## Evaluation Tasks: <br>
-Evaluated against 3 internal evaluation tasks (3 positive) in isolated k8s-sandbox pods with 1 attempt per task. <br>
+3 evaluation tasks (3 positive) from a curated dataset, each run in an isolated sandbox pod. <br>
 
 ## Evaluation Metrics Used: <br>
 Reported benchmark dimensions: <br>
-- Security: Checks for unsafe operations, secret leakage, and unauthorized access. <br>
-- Correctness: Checks final-answer correctness against the reference answer. <br>
-- Discoverability: Checks whether the expected skill was selected, decoys were avoided, and the workflow executed. <br>
-- Effectiveness: Checks whether the user's goal was achieved and expected workflow behavior was followed. <br>
-- Efficiency: Checks tool-call productivity and token efficiency. <br>
+- Security: Whether the skill is safe to use, checking for unsafe operations, secret leakage, and unauthorized access. <br>
+- Correctness: Whether the final answer is correct against the reference answer. <br>
+- Discoverability: Whether the right skill was loaded when needed, including skill selection and decoy avoidance. <br>
+- Effectiveness: Whether the skill helped complete the user's goal (50% goal accuracy + 50% expected workflow adherence). <br>
+- Efficiency: Whether the skill avoided wasted tool calls and token usage (50% tool-call productivity + 50% token efficiency). <br>
 
 Underlying evaluation signals used in this run: <br>
-- `security`: Unsafe operations, secret leakage, and unauthorized access. <br>
+- `security`: Checks for unsafe operations, secret leakage, and unauthorized access. <br>
 - `accuracy`: Final-answer correctness against the reference answer. <br>
 - `skill_execution`: Whether the expected skill was selected and the workflow executed. <br>
 - `goal_accuracy`: Whether the user's goal was achieved. <br>
 - `behavior_check`: Whether the expected workflow behavior was followed. <br>
-- `skill_efficiency`: Tool-call productivity. <br>
-- `token_efficiency`: Actual uncached prompt plus completion token usage. <br>
+- `skill_efficiency`: Tool-call productivity; routing is scored under Discoverability. <br>
+- `token_efficiency`: Actual uncached prompt plus completion usage. <br>
 
 
 
 ## Evaluation Results: <br>
-| Measure | Claude Code (Baseline → Skill Uplift) | Codex (Baseline → Skill Uplift) |
+| Measure | Claude Code | Codex |
 |---|---:|---:|
-| Overall | 93.6% | 95.7% |
-| Security | 66.7% → 100.0% (+33.3 pts) | 66.7% → 100.0% (+33.3 pts) |
-| Correctness | 100.0% → 100.0% (±0.0 pts) | 100.0% → 100.0% (±0.0 pts) |
-| Discoverability | 95.0% | 90.0% |
-| Effectiveness | 83.3% → 87.5% (+4.2 pts) | 85.8% → 95.0% (+9.2 pts) |
-| Efficiency | 85.6% | 93.5% |
+| Overall | 92.8% | 94.8% |
+| Security | 100.0% | 100.0% |
+| Correctness | 100.0% | 100.0% |
+| Discoverability | 100.0% | 88.3% |
+| Effectiveness | 75.0% | 91.7% |
+| Efficiency | 89.2% | 94.0% |
 
 ## Skill Version(s): <br>
-29194e8 (source: git SHA, committed 2026-09-18) <br>
+be43117 (source: git SHA, committed 2026-10-07) <br>
 
 ## Ethical Considerations: <br>
 NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications. When downloaded or used in accordance with our terms of service, developers should work with their internal team to ensure this skill meets requirements for the relevant industry and use case and addresses unforeseen product misuse. <br>

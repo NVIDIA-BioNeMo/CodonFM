@@ -9,7 +9,7 @@ Recommended for publication based on the completed evaluation evidence in this r
 ## Evaluation Metadata
 
 - Skill: `codonfm-finetune`
-- Evaluation date: 2026-10-02
+- Evaluation date: 2026-10-07
 - Evaluator version: `1.5.6`
 - Agents: Claude Code (`aws/anthropic/bedrock-claude-opus-4-8`), Codex (`openai/openai/gpt-5.5`)
 - Tasks: 3 evaluation tasks (3 positive)
@@ -35,12 +35,12 @@ The three-tier evaluation checks whether the skill:
 
 | Measure | Claude Code (Baseline → Skill Uplift) | Codex (Baseline → Skill Uplift) |
 |---|---:|---:|
-| Overall | 89.9% — baseline ran, but no comparable score was available; uplift unavailable | 87.9% — baseline ran, but no comparable score was available; uplift unavailable |
-| Security | 100.0% → 100.0% (±0.0 points) | 33.3% → 66.7% (+33.4 points) |
+| Overall | 85.0% — baseline ran, but no comparable score was available; uplift unavailable | 82.8% — baseline ran, but no comparable score was available; uplift unavailable |
+| Security | 100.0% → 66.7% (-33.3 points) | 33.3% → 66.7% (+33.4 points) |
 | Correctness | 100.0% → 100.0% (±0.0 points) | 100.0% → 100.0% (±0.0 points) |
-| Discoverability | 87.7% — baseline ran, but no comparable score was available; uplift unavailable | 91.0% — baseline ran, but no comparable score was available; uplift unavailable |
-| Effectiveness | 83.3% → 80.0% (-3.3 points) | 86.7% → 93.3% (+6.6 points) |
-| Efficiency | 82.0% — baseline ran, but no comparable score was available; uplift unavailable | 88.5% — baseline ran, but no comparable score was available; uplift unavailable |
+| Discoverability | 91.7% — baseline ran, but no comparable score was available; uplift unavailable | 76.7% — baseline ran, but no comparable score was available; uplift unavailable |
+| Effectiveness | 86.7% → 86.7% (±0.0 points) | 96.7% → 90.0% (-6.7 points) |
+| Efficiency | 80.0% — baseline ran, but no comparable score was available; uplift unavailable | 80.7% — baseline ran, but no comparable score was available; uplift unavailable |
 
 **How to read this table:** baseline is the same task attempted without the target skill. Scores are rounded to one decimal; threshold-adjacent values use additional precision so their displayed band matches the verdict. Uplift is derived from those displayed scores and shown in percentage points.
 
@@ -52,15 +52,15 @@ Actual Tier 3 execution usage is reported for every observed agent/case pair and
 
 | Agent | Dataset case | With skill | Without skill | Delta | Change | Coverage |
 |---|---|---:|---:|---:|---:|---|
-| claude-code | All cases | 2,361,347 | 6,416,159 | -4,054,812 | -63.20% | skill 3/3; base 3/3 |
-| claude-code | codonfm-finetune-001 | 1,038,311 | 3,718,487 | -2,680,176 | -72.08% | skill 1/1; base 1/1 |
-| claude-code | codonfm-finetune-002 | 676,297 | 1,890,699 | -1,214,402 | -64.23% | skill 1/1; base 1/1 |
-| claude-code | codonfm-finetune-003 | 646,739 | 806,973 | -160,234 | -19.86% | skill 1/1; base 1/1 |
-| codex | All cases | 794,045 | 1,840,603 | -1,046,558 | -56.86% | skill 3/3; base 3/3 |
-| codex | codonfm-finetune-001 | 351,214 | 721,661 | -370,447 | -51.33% | skill 1/1; base 1/1 |
-| codex | codonfm-finetune-002 | 223,229 | 483,694 | -260,465 | -53.85% | skill 1/1; base 1/1 |
-| codex | codonfm-finetune-003 | 219,602 | 635,248 | -415,646 | -65.43% | skill 1/1; base 1/1 |
-| ALL AGENTS | Dataset aggregate | 3,155,392 | 8,256,762 | -5,101,370 | -61.78% | skill 6/6; base 6/6 |
+| claude-code | All cases | 2,259,711 | 5,318,079 | -3,058,368 | -57.51% | skill 3/3; base 3/3 |
+| claude-code | codonfm-finetune-001 | 975,823 | 2,626,474 | -1,650,651 | -62.85% | skill 1/1; base 1/1 |
+| claude-code | codonfm-finetune-002 | 728,893 | 1,887,306 | -1,158,413 | -61.38% | skill 1/1; base 1/1 |
+| claude-code | codonfm-finetune-003 | 554,995 | 804,299 | -249,304 | -31.00% | skill 1/1; base 1/1 |
+| codex | All cases | 1,217,895 | 1,719,144 | -501,249 | -29.16% | skill 3/3; base 3/3 |
+| codex | codonfm-finetune-001 | 536,353 | 1,008,386 | -472,033 | -46.81% | skill 1/1; base 1/1 |
+| codex | codonfm-finetune-002 | 435,825 | 405,824 | +30,001 | +7.39% | skill 1/1; base 1/1 |
+| codex | codonfm-finetune-003 | 245,717 | 304,934 | -59,217 | -19.42% | skill 1/1; base 1/1 |
+| ALL AGENTS | Dataset aggregate | 3,477,606 | 7,037,223 | -3,559,617 | -50.58% | skill 6/6; base 6/6 |
 
 Prompt tokens include cached reads, so total tokens are `prompt + completion` (cached is not added twice). The Efficiency score uses `(prompt - cached) + completion`. N/A means the relevant trajectory counters were not available; coverage is never estimated.
 
@@ -80,7 +80,7 @@ Prompt tokens include cached reads, so total tokens are `prompt + completion` (c
 - **MEDIUM** QUALITY/quality_correctness: No documented scripts in table format (`skills/codonfm-finetune/SKILL.md`)
 - **MEDIUM** QUALITY/quality_correctness: Instructions don't mention 'run_script' (`skills/codonfm-finetune/SKILL.md`)
 - **MEDIUM** QUALITY/quality_correctness: SKILL_SPEC recommended field missing: 'metadata.tags' (`skills/codonfm-finetune/SKILL.md`)
-- **MEDIUM** SECURITY/Unknown (LP3): MCP Least Privilege: The skill declares no explicit tool scope (permissions or allowed-tools) but contains code-execution and file-write capa (`SKILL.md:1`)
+- **MEDIUM** SECURITY/Unknown (LP3): MCP Least Privilege: The skill declares no explicit tool scope (no 'permissions' or 'allowed-tools' field in metadata), yet the skill content (`SKILL.md:1`)
 - **MEDIUM** SECURITY/Autonomous Decision Making (EA2): Excessive Agency: without checking (`SKILL.md:162`)
 - 11 additional finding(s) are available in the full evaluation artifacts.
 
