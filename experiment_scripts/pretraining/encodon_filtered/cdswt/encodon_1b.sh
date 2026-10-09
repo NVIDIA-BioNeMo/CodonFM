@@ -1,6 +1,9 @@
 #!/bin/bash
 set -ex
 
+: "${WANDB_PROJECT:?Set WANDB_PROJECT to your WandB project name}"
+: "${WANDB_ENTITY:?Set WANDB_ENTITY to your WandB entity name}"
+
 # - hyperparameters
 learning_rate=5e-5
 num_nodes=48
@@ -28,4 +31,6 @@ python -m src.runner pretrain \
     --split_name_prefix nopathogen \
     --taxid_exclusion_file /data/ncbi/taxids_to_remove.json \
     --checkpoints_dir /results/checkpoints/${exp_name} \
-    --enable_wandb
+    --enable_wandb \
+    --project_name "$WANDB_PROJECT" \
+    --entity "$WANDB_ENTITY"
