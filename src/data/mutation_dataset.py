@@ -24,7 +24,7 @@ from pathlib import Path
 import copy
 from transformers import AutoTokenizer
 
-from src.data.metadata import MetadataFields, MetadataConstants
+from src.data.metadata import MetadataFields, MetadataConstants, SplitNames
 
 logger = logging.getLogger(__name__)
 class MutationDataset(torch.utils.data.Dataset):
@@ -45,7 +45,8 @@ class MutationDataset(torch.utils.data.Dataset):
                  train_val_test_ratio: Optional[List[float]] = None, # - if not provided run through all data
                  label_col: Optional[str] = None,
                  ):
-        is_eval = train_val_test_ratio is None
+        if task != "mlm":
+            raise ValueError("MutationDataset only supports the MLM task")
         data = pl.read_csv(data_path, ignore_errors=True).to_pandas()
         self.tokenizer = tokenizer
         self.variant_id_col = id_col
@@ -55,7 +56,7 @@ class MutationDataset(torch.utils.data.Dataset):
         self.ref_codon_col = ref_codon_col
         self.alt_codon_col = alt_codon_col
         self.context_length = context_length
-        self.adjusted_context_length = context_length - MetadataConstants.MLM_TOK_ADJUST if task == "mlm" else context_length - MetadataConstants.NEXT_TOKEN_PREDICTION_TOK_ADJUST
+        self.adjusted_context_length = context_length - MetadataConstants.MLM_TOK_ADJUST
         self.sequence_extractor = FastRefAlt(context_length=self.adjusted_context_length)
         self.process_item = process_item
         self.seed = seed
@@ -68,7 +69,7 @@ class MutationDataset(torch.utils.data.Dataset):
             self.data = data
         
         self.train_idx, self.val_idx, self.test_idx = None, None, None
-        if not is_eval:
+        if not train_val_test_ratio is None:
             assert train_val_test_ratio is not None, "train_val_test_ratio must be provided for training"
             assert sum(train_val_test_ratio) == 1.0, "train_val_test_ratio must sum to 1.0"
             self.train_idx, self.val_idx, self.test_idx = self.load_train_val_test_indices(
@@ -159,12 +160,14 @@ class MutationDataset(torch.utils.data.Dataset):
         return copy.copy(self)
 
     def get_num_samples(self, split):
-        if split == "train":
+        if split == SplitNames.TRAIN:
             return self.get_train_num_samples()
-        elif split == "valid":
+        elif split == SplitNames.VAL:
             return self.get_val_num_samples()
-        elif split == "test":
+        elif split == SplitNames.TEST:
             return self.get_test_num_samples()
+        elif split == SplitNames.ALL:
+            return len(self.data)
         else:
             raise ValueError(f"Invalid split: {split}")
 
@@ -202,7 +205,13 @@ class MutationDataset(torch.utils.data.Dataset):
         copy.process_item = process_item
         copy.idxs = self.test_idx
         return copy
-
+    
+    def get_predict(self, process_item):
+        """modifies indices to correspond to `all` split"""
+        copy = self.copy()
+        copy.process_item = process_item
+        copy.idxs = np.arange(len(self.data))
+        return copy
 
 def collate_fn(batch):
     collated_batch = {}

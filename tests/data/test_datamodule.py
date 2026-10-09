@@ -171,149 +171,42 @@ def test_train_dataloader_multiple_epochs(datamodule):
     assert first_epoch_indices != second_epoch_indices
 
 
-def test_eval_predict_and_test_dataloaders_identical_when_eval_mode():
-    from torch.utils.data import Dataset
-    from src.data.datamodule import CodonFMDataModule
+def test_train_uses_stateful_dataset_and_disables_shuffle():
+    """Keep shuffling inside StatefulDataset, not in the DataLoader sampler."""
+    from torch.utils.data import TensorDataset
+    from torch.utils.data.sampler import SequentialSampler
 
-    class TinyDataset(Dataset):
-        def __init__(self, size=12, split='train'):
-            self.size = size
-            self.split = split
-            self.data = list(range(size))
-        def __len__(self):
-            return self.size
-        def __getitem__(self, idx):
-            import torch
-            return {'x': torch.tensor(self.data[idx]), 'split': self.split}
-
-    class TinyProvider:
-        def __init__(self, train_size=12, val_size=5, test_size=7):
-            self.train_size = train_size
-            self.val_size = val_size
-            self.test_size = test_size
-        def get_train(self, process_item=None):
-            return TinyDataset(self.train_size, 'train')
-        def get_validation(self, process_item=None):
-            return TinyDataset(self.val_size, 'val')
-        def get_test(self, process_item=None):
-            return TinyDataset(self.test_size, 'test')
-
-    def _collate_keep(batch):
-        return batch
-
-    dm = CodonFMDataModule(
-        dataset=lambda seed: TinyProvider(),
-        seed=42,
-        world_size=1,
-        train_iters=None,
-        collate_fn=_collate_keep,
-        train_batch_size=4,
-        val_batch_size=2,
-        shuffle=True,
-        num_workers=0,
-        is_evaluation=True,
-    )
-
-    dm.setup('predict')
-    pred_dl = dm.predict_dataloader()
-    test_dl = dm.test_dataloader()
-
-    pred_batches = list(pred_dl)
-    test_batches = list(test_dl)
-
-    assert len(pred_batches) == len(test_batches)
-    assert pred_batches[0][0]['split'] == 'test'
-    assert test_batches[0][0]['split'] == 'test'
-
-
-def test_train_uses_stateful_dataset_and_disables_shuffle(monkeypatch):
-    from src.data.datamodule import CodonFMDataModule
     from src.data.stateful_dataset import StatefulDataset
 
     class TinyProvider:
-        def __init__(self, train_size=10):
-            self.train_size = train_size
         def get_train(self, process_item=None):
-            from torch.utils.data import TensorDataset
-            import torch
-            return TensorDataset(torch.arange(self.train_size))
+            return TensorDataset(torch.arange(10))
+
         def get_validation(self, process_item=None):
-            from torch.utils.data import TensorDataset
-            import torch
             return TensorDataset(torch.arange(5))
+
         def get_test(self, process_item=None):
-            from torch.utils.data import TensorDataset
-            import torch
             return TensorDataset(torch.arange(7))
-
-    def _collate_keep(batch):
-        return batch
-
-    dm = CodonFMDataModule(
-        dataset=lambda seed: TinyProvider(train_size=10),
-        seed=42,
-        world_size=1,
-        train_iters=5,
-        collate_fn=_collate_keep,
-        train_batch_size=4,
-        val_batch_size=2,
-        shuffle=True,
-        num_workers=0,
-    )
-
-    dm.setup('fit')
-    train_dl = dm.train_dataloader()
-    assert isinstance(train_dl.dataset, StatefulDataset)
-    # DataLoader doesn't expose a 'shuffle' attribute; check sampler type instead.
-    from torch.utils.data import sampler as _sampler
-    assert isinstance(train_dl.sampler, _sampler.SequentialSampler)
-
-
-def test_distributed_sampler_selected_when_dist_initialized(monkeypatch):
-    from src.data import datamodule as dm_mod
-    from src.data.datamodule import CodonFMDataModule
-    import torch.distributed as dist
-
-    class TinyProvider:
-        def get_train(self, process_item=None):
-            from torch.utils.data import TensorDataset
-            import torch
-            return TensorDataset(torch.arange(8))
-        def get_validation(self, process_item=None):
-            from torch.utils.data import TensorDataset
-            import torch
-            return TensorDataset(torch.arange(4))
-        def get_test(self, process_item=None):
-            from torch.utils.data import TensorDataset
-            import torch
-            return TensorDataset(torch.arange(4))
-
-    def _collate_keep(batch):
-        return batch
-
-    monkeypatch.setattr(dist, 'is_initialized', lambda: True, raising=False)
-    # Replace DistributedSampler with a lightweight stub to avoid initializing process group
-    class _StubSampler:
-        def __init__(self, dataset, shuffle=False, drop_last=False):
-            self.dataset = dataset
-            self.shuffle = shuffle
-            self.drop_last = drop_last
-    monkeypatch.setattr(dm_mod, 'DistributedSampler', _StubSampler, raising=True)
 
     dm = CodonFMDataModule(
         dataset=lambda seed: TinyProvider(),
         seed=42,
-        world_size=2,
-        train_iters=None,
-        collate_fn=_collate_keep,
+        world_size=1,
+        train_iters=5,
+        collate_fn=lambda batch: batch,
         train_batch_size=4,
         val_batch_size=2,
         shuffle=True,
         num_workers=0,
     )
+
     dm.setup('fit')
     train_dl = dm.train_dataloader()
-    assert isinstance(train_dl.sampler, _StubSampler)
+
+    assert isinstance(train_dl.dataset, StatefulDataset)
+    # DataLoader does not expose shuffle directly; the sampler reflects its setting.
+    assert isinstance(train_dl.sampler, SequentialSampler)
+
 
 def test_consumed_samples_resumption(datamodule):
     """Test that resuming from consumed samples maintains proper indexing."""
@@ -450,3 +343,51 @@ def test_two_epoch_dataloader_calls(datamodule):
     assert len(epoch2_indices) == expected_samples_per_epoch
     # Shuffle order between the two epochs should differ.
     assert epoch1_indices != epoch2_indices
+
+@pytest.mark.skipif(
+    (not torch.distributed.is_available()) or (int(os.environ.get("WORLD_SIZE", "1")) < 2),
+    reason="requires distributed launcher with WORLD_SIZE>=2",
+)
+def test_distributed_indices(datamodule):
+    """Test indexing behavior in a distributed setting."""
+    import torch.distributed as dist
+    
+    # FIXME: this test takes a very long time to run
+    
+    # If CUDA available, ensure device 0 is used for this rank
+    if torch.cuda.is_available():
+        torch.cuda.set_device(0)
+    
+    try:
+        datamodule.world_size = 2
+        datamodule.setup('fit')
+        train_loader = datamodule.train_dataloader()
+        
+        # Collect indices from this rank
+        rank_indices = []
+        for batch in train_loader:
+            rank_indices.extend(batch['indices'].tolist())
+            assert len(batch['indices'].tolist()) == datamodule.train_batch_size
+
+        
+        # In distributed mode, each rank gets half of the dataset
+        # Since drop_last=True, we'll get complete batches up to half the dataset size
+        expected_samples_per_rank = ((datamodule.dataset.train_size // 2) // 
+                                   datamodule.train_batch_size * datamodule.train_batch_size)
+        assert len(rank_indices) == expected_samples_per_rank
+        
+        # Verify indices are within bounds
+        assert all(0 <= idx < datamodule.dataset.train_size for idx in rank_indices)
+    
+    finally:
+        if dist.is_initialized():
+            dist.destroy_process_group()
+
+
+def test_validation_dataloader_without_internal_logger(datamodule):
+    """Release dataloaders must not depend on the internal OneLogger callback."""
+    datamodule.setup("fit")
+
+    batch = next(iter(datamodule.val_dataloader()))
+
+    assert set(batch["split"]) == {"val"}

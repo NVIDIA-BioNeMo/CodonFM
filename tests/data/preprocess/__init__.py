@@ -13,29 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
-
-class MetadataFields(str, Enum):
-    ID = 'id'
-    INPUT_IDS = 'input_ids'
-    ATTENTION_MASK = 'attention_mask'
-    LABELS = 'labels'
-    INPUT_MASK = 'mask'
-    REF_CODON_TOKS = 'ref_codon_toks'
-    ALT_CODON_TOKS = 'alt_codon_toks'
-    MUTATION_TOKEN_IDX = 'mutation_token_idx'
-
-class MetadataConstants:
-    CODON_LENGTH = 3
-    MLM_TOK_ADJUST = 2
-
-class TrainerModes(str, Enum):
-    PRETRAIN = 'pretrain'
-    FINETUNE = 'finetune'
-    PREDICT = 'predict'
-
-class SplitNames(str, Enum):
-    ALL = 'all'
-    TRAIN = 'train'
-    VAL = 'val'
-    TEST = 'test'
+# Preprocess tests

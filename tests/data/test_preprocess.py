@@ -51,4 +51,3 @@ def test_codon_sequence_process_item_padding():
     assert out['input_ids'].shape == (6,)
     # last positions are pad
     assert out['input_ids'][-1] == tok.pad_token_id
-

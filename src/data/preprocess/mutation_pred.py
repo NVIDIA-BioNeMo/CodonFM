@@ -49,7 +49,6 @@ def _construct_sentence(ref_seq, codon_position, ref_codon, alt_codon, context_l
     input_sequence_toks = input_sequence_toks[:context_length]
     return input_sequence_toks, ref_codon_toks, alt_codon_toks, attention_mask, mutation_token_idx
 
-
 def mlm_process_item(ref_seq, codon_position, ref_codon, alt_codon, context_length, tokenizer, mask_mutation=True):    
     input_sequence_toks, ref_codon_toks, alt_codon_toks, attention_mask, mutation_token_idx = _construct_sentence(ref_seq, 
                                                                                                                   codon_position, 
@@ -69,11 +68,7 @@ def mlm_process_item(ref_seq, codon_position, ref_codon, alt_codon, context_leng
     }
 
 
-def likelihood_process_item(ref_seq, codon_position, ref_codon, alt_codon, context_length, tokenizer):
-    """
-    Processes a sequence for likelihood prediction. 
-    The input sequence is the reference sequence with the alternative codon used at the mutation site.
-    """    
+def likelihood_process_item(ref_seq, codon_position, ref_codon, alt_codon, context_length, tokenizer):    
     input_sequence_toks, _, _, attention_mask, _ = _construct_sentence(ref_seq, 
                                                                        codon_position, 
                                                                        ref_codon, 

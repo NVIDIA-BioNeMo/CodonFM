@@ -26,7 +26,8 @@ def process_item(tokenizer: Any,
                  mask_replace_prob: float = 0.8,
                  random_replace_prob: float = 0.1,
                  ignore_index: int = -100,
-                 codon_weights: np.array = None) -> Dict[str, List[int]]:
+                 codon_weights: np.array = None,
+                 organism_token: int = None) -> Dict[str, List[int]]:
     """
     Process an item from the dataset.
 

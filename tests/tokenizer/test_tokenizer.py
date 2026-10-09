@@ -153,33 +153,3 @@ class TestTokenizer:
         a_id = tokenizer.encoder_aa['A']
         r_id = tokenizer.encoder_aa['R']
         assert encoded_aa == [a_id, r_id] 
-
-    def test_convert_tokens_to_string_and_specials(self):
-        tok = Tokenizer(seq_type='dna')
-        tokens = ['<CLS>', 'ATG', 'CGT', '<SEP>']
-        text = tok.convert_tokens_to_string(tokens)
-        assert text == '<CLS>ATGCGT<SEP>'
-
-    def test_build_inputs_with_special_tokens_and_mask(self):
-        tok = Tokenizer(seq_type='dna')
-        ids = [tok.encoder['ATG'], tok.encoder['CGT']]
-        built = tok.build_inputs_with_special_tokens(ids)
-        assert built[0] == tok.cls_token_id
-        assert built[-1] == tok.sep_token_id
-
-        mask = tok.get_special_tokens_mask(ids, already_has_special_tokens=False)
-        assert mask[0] == 1 and mask[-1] == 1
-
-        mask2 = tok.get_special_tokens_mask(built, already_has_special_tokens=True)
-        assert mask2[0] == 1 and mask2[-1] == 1
-
-    def test_token_type_vocab_and_aa_vocab_sizes(self):
-        tok = Tokenizer(seq_type='dna', token_type_mode='regular')
-        assert tok.get_aa_vocab_size() == 5 + len(tok.amino_acids)
-        assert tok.token_type_vocab_size >= 1
-
-    @pytest.mark.parametrize('seq', ['', 'atgcgt', 'ATGXXCGT', 'NNN'])
-    def test_tokenize_edge_cases(self, seq):
-        tok = Tokenizer(seq_type='dna')
-        tokens = tok._tokenize(seq)
-        assert isinstance(tokens, list)

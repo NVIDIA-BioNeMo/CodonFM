@@ -20,6 +20,8 @@ import torch.distributed as dist
 from torch.utils.data import DataLoader, DistributedSampler, Dataset
 import logging
 
+from src.data.metadata import TrainerModes
+
 from .stateful_dataset import StatefulDataset
 
 logger = logging.getLogger(__name__)
@@ -46,7 +48,7 @@ class CodonFMDataModule(L.LightningDataModule):
         pin_memory (bool): Whether to pin memory.
         persistent_workers (bool): Whether to use persistent workers.
         process_item (Callable): Function to process each item.
-        is_evaluation (bool): Whether this is for evaluation/prediction only.
+        mode (TrainerModes): Trainer mode, if prediction mode is used, shuffle will be set to False and all samples will be used.
     """
     def __init__(self,
                  dataset: Callable,
@@ -62,7 +64,7 @@ class CodonFMDataModule(L.LightningDataModule):
                  pin_memory: bool = False,
                  persistent_workers: bool = False,
                  process_item: Callable = lambda *x: x,
-                 is_evaluation: bool = False, # if True, whole dataset will be used for evaluation.
+                 mode: TrainerModes = TrainerModes.PRETRAIN,
                  ):
         super().__init__()
         
@@ -71,8 +73,8 @@ class CodonFMDataModule(L.LightningDataModule):
         self.init_global_step = 0
         self.num_workers = num_workers
         self.dataset = dataset
-        self.is_evaluation = is_evaluation
-        if self.is_evaluation:
+        self.mode = mode
+        if self.mode == TrainerModes.PREDICT:
             shuffle = False
         
         self.shuffle = shuffle
@@ -105,7 +107,7 @@ class CodonFMDataModule(L.LightningDataModule):
                     global_batch_size=None,
                     shuffle=False):
         """Wrap dataset with StatefulDataset for upsampling/resampling."""
-        if not self.is_evaluation and total_samples > len(dataset):
+        if self.mode != TrainerModes.PREDICT and total_samples > len(dataset):
             logger.info(f"Resampling dataset with {len(dataset)} samples to {total_samples}")
             dataset = StatefulDataset(
                 dataset=dataset,
@@ -118,8 +120,8 @@ class CodonFMDataModule(L.LightningDataModule):
         return dataset
 
     def train_dataloader(self) -> DataLoader:
-        if self.is_evaluation:
-            # For evaluation mode, return test dataloader
+        if self.mode == TrainerModes.PREDICT:
+            # For prediction mode, return test dataloader
             return self.test_dataloader()
         
         train_ds = self.dataset.get_train(self.hparams.process_item)
@@ -159,7 +161,7 @@ class CodonFMDataModule(L.LightningDataModule):
         return dl
 
     def val_dataloader(self) -> DataLoader:
-        if self.is_evaluation:
+        if self.mode == TrainerModes.PREDICT:
             return self.test_dataloader()
         val_ds = self.dataset.get_validation(self.hparams.process_item)
         sampler = None
@@ -177,7 +179,10 @@ class CodonFMDataModule(L.LightningDataModule):
         return dl
 
     def test_dataloader(self) -> DataLoader:
-        test_ds = self.dataset.get_test(self.hparams.process_item)
+        if self.mode == TrainerModes.PREDICT:
+            test_ds = self.dataset.get_predict(self.hparams.process_item)
+        else:
+            test_ds = self.dataset.get_test(self.hparams.process_item)
         sampler = None
         if dist.is_initialized():
             sampler = DistributedSampler(test_ds, shuffle=False)

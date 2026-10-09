@@ -64,6 +64,7 @@ class TestFastRefAlt:
         assert ref_codon == "AAA"
         assert alt_codon == "CCC"
 
+
 class TestMutationDataset:
     def test_init_and_split(self, mock_csv_path):
         ds = MutationDataset(

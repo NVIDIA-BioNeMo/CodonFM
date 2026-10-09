@@ -21,6 +21,7 @@ from typing import Callable, List, Tuple
 import torch
 import numpy as np
 from tqdm import tqdm
+from .metadata import MetadataConstants, SplitNames
 from .utils import load_train_val_test_indices_proportional
 
 def get_group_codon_weights(codon_weights_file, tokenizer):
@@ -60,9 +61,9 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
     def __init__(self,
                  data_path: str,
                  tokenizer: Callable,
+                 pretraining_task,
                  context_length: int = 2048,
                  context_overlap: int = 0,
-                 pretraining_task: str = "mlm",
                  train_val_test_ratio: List[float] = [0.9998, 0.0002, 0.00],
                  process_item: Callable = lambda *x, **kwargs: (x, kwargs),
                  min_seq_length: int = 100,
@@ -94,12 +95,9 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
             self.taxids_to_exclude = get_taxids_to_exclude(taxid_exclusion_file)
             print(f'loaded {len(self.taxids_to_exclude)} taxids to exclude')
       
-        if self.pretraining_task == "mlm":
-            self.tok_adjust = 2
-        elif self.pretraining_task == "next_token_prediction":
-            self.tok_adjust = 1
-        else:
+        if self.pretraining_task != "mlm":
             raise ValueError(f"Invalid pretraining_task '{pretraining_task}'")
+        self.tok_adjust = MetadataConstants.MLM_TOK_ADJUST
 
         with open(self.metadata_path, 'r') as f:
             self.metadata = json.load(f)
@@ -133,6 +131,14 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
         if cache_path.exists():
             print("Loading cached global indices...")
             self.global_indices = np.load(cache_path, allow_pickle=True)
+            # - caches written before taxid was stored have 3 columns
+            if self.global_indices.ndim != 2 or self.global_indices.shape[1] != 4:
+                raise ValueError(
+                    f"Cached global indices at {cache_path} have shape {self.global_indices.shape}, "
+                    "expected (N, 4) with columns (chunk_id, start, end, taxid). This cache was "
+                    "likely created by an older release. Delete it to rebuild, or use a new "
+                    "--split_name_prefix."
+                )
             if key_cache_path.exists(): # - added for backward compatability
                 self.global_keys = np.load(key_cache_path, allow_pickle=True)
             else:
@@ -141,11 +147,8 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
             print("Computing global indices for subsequences...")
             global_indices_list = []
             total_sequences = sum(len(idx_mmap) for idx_mmap in self.indices_mmaps)
-            if seq_cluster_path.exists():
-                seq_clusters = np.load(seq_cluster_path, allow_pickle=True)
-                assert seq_clusters.shape[0] == total_sequences, "Mismatch in sequence clusters and total sequences."
-            else:
-                seq_clusters = np.arange(total_sequences, dtype=int) # NOTE: this is a placeholder for the case where the sequence clusters are not available
+            seq_clusters = np.load(seq_cluster_path, allow_pickle=True)
+            assert seq_clusters.shape[0] == total_sequences, "Mismatch in sequence clusters and total sequences."
 
             global_seq_idx = 0
             global_keys = []
@@ -171,7 +174,7 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
                             start_token_idx = seq_start + sub_seq_idx * step_size
                             end_token_idx = min(start_token_idx + (self.context_length - self.tok_adjust), seq_end)
                             if end_token_idx > start_token_idx:
-                                global_indices_list.append([chunk_id, start_token_idx, end_token_idx])
+                                global_indices_list.append([chunk_id, start_token_idx, end_token_idx, taxid])
                                 global_keys.append(seq_cluster_idx)
                         pbar.update(1)
 
@@ -228,12 +231,14 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
         return len(self.current_split_indices)
 
     def set_split(self, split: str):
-        if split == "train":
+        if split == SplitNames.TRAIN:
             self.current_split_indices = self.train_indices
-        elif split == "valid":
+        elif split == SplitNames.VAL:
             self.current_split_indices = self.val_indices
-        elif split == "test":
+        elif split == SplitNames.TEST:
             self.current_split_indices = self.test_indices
+        elif split == SplitNames.ALL:
+            self.current_split_indices = self.global_indices
         else:
             raise ValueError(f"Invalid split '{split}'")
 
@@ -245,20 +250,19 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         global_idx = self.current_split_indices[idx]
-        chunk_id, start_token_idx, end_token_idx = self.global_indices[global_idx]
+        chunk_id, start_token_idx, end_token_idx, taxid = self.global_indices[global_idx]
         if self.codon_weights:
             group = self.metadata['file_metadata'][chunk_id]['file_name'].split('.')[0]
             codon_weights = self.codon_weights[group]
         else:
             codon_weights = None
-
         sequence_tokens = self.sequences_mmaps[chunk_id][start_token_idx:end_token_idx]
-
         return self.process_item(
             tokenizer=self.tokenizer,
             sequence_tokens=sequence_tokens,
             context_length=self.context_length,
-            codon_weights=codon_weights
+            codon_weights=codon_weights,
+            organism_token=taxid
         )
 
     def get_train(self, 
@@ -266,7 +270,7 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
                  ) -> "CodonMemmapDataset":
         dataset_copy = CodonMemmapDataset.__new__(CodonMemmapDataset)
         dataset_copy.__dict__ = {**self.__dict__}
-        dataset_copy.set_split("train")
+        dataset_copy.set_split(SplitNames.TRAIN)
         dataset_copy.process_item = process_item
         return dataset_copy
 
@@ -275,7 +279,7 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
                       ) -> "CodonMemmapDataset":
         dataset_copy = CodonMemmapDataset.__new__(CodonMemmapDataset)
         dataset_copy.__dict__ = {**self.__dict__}
-        dataset_copy.set_split("valid")
+        dataset_copy.set_split(SplitNames.VAL)
         dataset_copy.process_item = process_item
         return dataset_copy
 
@@ -284,7 +288,14 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
                 ) -> "CodonMemmapDataset":
         dataset_copy = CodonMemmapDataset.__new__(CodonMemmapDataset)
         dataset_copy.__dict__ = {**self.__dict__}
-        dataset_copy.set_split("test")
+        dataset_copy.set_split(SplitNames.TEST)
+        dataset_copy.process_item = process_item
+        return dataset_copy
+    
+    def get_predict(self, process_item: Callable) -> "CodonMemmapDataset":
+        dataset_copy = CodonMemmapDataset.__new__(CodonMemmapDataset)
+        dataset_copy.__dict__ = {**self.__dict__}
+        dataset_copy.set_split(SplitNames.ALL)
         dataset_copy.process_item = process_item
         return dataset_copy
 
@@ -295,6 +306,8 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
             return self.get_val_num_samples()
         elif split == "test":
             return self.get_test_num_samples()
+        elif split == SplitNames.ALL:
+            return self.get_predict_num_samples()
         else:
             raise ValueError(f"Invalid split: {split}")
 
@@ -306,3 +319,6 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
 
     def get_test_num_samples(self):
         return len(self.test_indices)
+
+    def get_predict_num_samples(self):
+        return len(self.global_indices)

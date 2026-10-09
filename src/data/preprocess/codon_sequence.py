@@ -15,7 +15,12 @@
 
 import numpy as np
 
+
 def process_item(seq, context_length, tokenizer):
+    """Process item for MLM (bidirectional) models like Encodon.
+    
+    Adds CLS token at start and SEP token at end.
+    """
     input_sequence_toks = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(seq))
     input_sequence_toks = np.asarray(input_sequence_toks)[:(context_length - 2)]
     

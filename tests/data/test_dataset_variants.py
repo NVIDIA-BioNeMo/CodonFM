@@ -44,6 +44,7 @@ def _write_memmap_dir(tmpdir):
     }
     with open(os.path.join(d, 'metadata.json'), 'w') as f:
         json.dump(metadata, f)
+    np.save(os.path.join(d, 'allSeqClusterIdx.npy'), np.arange(len(idx)))
     return d
 
 
@@ -60,7 +61,7 @@ def test_codon_memmap_dataset_smoke(tmpdir):
     data_dir = _write_memmap_dir(tmpdir)
     tok = _dummy_tokenizer()
 
-    def process_item(tokenizer, sequence_tokens, context_length, codon_weights=None):
+    def process_item(tokenizer, sequence_tokens, context_length, codon_weights=None, organism_token=None):
         # Return minimal structure the downstream expects
         return {'input_ids': sequence_tokens[: min(8, len(sequence_tokens))]}
 
@@ -90,6 +91,22 @@ def test_codon_memmap_dataset_smoke(tmpdir):
     assert len(train) + len(val) + len(test) == len(ds.train_indices) + len(ds.val_indices) + len(ds.test_indices)
 
 
+def test_codon_memmap_dataset_rejects_legacy_cache(tmpdir):
+    data_dir = _write_memmap_dir(tmpdir)
+    # Cache written before taxid was stored: (chunk_id, start, end)
+    np.save(os.path.join(data_dir, 'metadata.cache_legacy.npy'), np.array([[0, 0, 8], [0, 50, 58]]))
+
+    with pytest.raises(ValueError, match="expected \\(N, 4\\)"):
+        CodonMemmapDataset(
+            data_path=data_dir,
+            tokenizer=_dummy_tokenizer(),
+            context_length=8,
+            pretraining_task='mlm',
+            train_val_test_ratio=[0.5, 0.25, 0.25],
+            split_name_prefix='legacy',
+        )
+
+
 def test_codon_bert_dataset_basic(tmpdir):
     df = pd.DataFrame({
         'id': ['a', 'b', 'c', 'd'],
@@ -113,5 +130,3 @@ def test_codon_bert_dataset_basic(tmpdir):
     assert len(ds_train) == 2 and len(ds_val) == 1 and len(ds_test) == 1
     item = ds_all[0]
     assert 'input_ids' in item and 'labels' in (k.lower() for k in item.keys())
-
-
