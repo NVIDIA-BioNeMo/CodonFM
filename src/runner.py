@@ -19,11 +19,13 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
+import fiddle as fdl
+
 from src.tasks import train, finetune, evaluate
 from src.config import get_config
 from src.utils.nemorun_utils import config_to_dict
-import fiddle as fdl
-
+from src.data.metadata import TrainerModes
+from src.inference.task_types import TaskTypes
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +33,9 @@ log = logging.getLogger(__name__)
 def get_parser():
     parser = argparse.ArgumentParser(description="Codon-FM Runner Script")
     parser.add_argument(
-        "mode", choices=["pretrain", "finetune", "eval"], help="Mode to run."
+        "mode",
+        choices=["pretrain", "finetune", "eval"],
+        help="Mode to run.",
     )
     # General arguments
     parser.add_argument("--exp_name", type=str, required=True)
@@ -44,16 +48,21 @@ def get_parser():
     parser.add_argument("--enable_wandb", action="store_true", default=False, help="Enable Weights & Biases logging.")
 
     # Container-like path overrides
-    parser.add_argument("--out_dir", type=str, default='/results/', help="Base output directory.")
+    parser.add_argument("--out_dir", type=str, default="/results/", help="Base output directory.")
     parser.add_argument("--checkpoints_dir", type=str, default=None, help="Checkpoints directory. Defaults to <out_dir>/checkpoints.")
     parser.add_argument("--pretrained_ckpt_path", type=str, default=None, help="Path to pretrained checkpoint. Defaults to --checkpoint_path if set.")
 
     # Data arguments
-    parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument(
-        "--process_item", 
-        type=str, 
-        required=True, 
+        "--data_path",
+        type=str,
+        default=None,
+        help="Input data path.",
+    )
+    parser.add_argument(
+        "--process_item",
+        type=str,
+        required=True,
         choices=['mlm_memmap', 'mutation_pred_mlm', 'mutation_pred_likelihood', 'codon_sequence']
     )
     parser.add_argument("--dataset_name", type=str, required=True, choices=["CodonMemmapDataset", "MutationDataset", "CodonBertDataset"])
@@ -67,10 +76,11 @@ def get_parser():
     parser.add_argument("--split_name_prefix", type=str, default="")
 
     # Model arguments
-    parser.add_argument("--model_name", type=str, required=True, choices=["encodon_80m", "encodon_600m", "encodon_1b", "encodon_5b", "encodon_10b"])
+    parser.add_argument("--model_name", type=str, required=True, choices=["encodon_80m", "encodon_600m", "encodon_1b"])
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--weight_decay", type=float, default=0.01)
     parser.add_argument("--max_steps", type=int, default=10_000_000)
+    parser.add_argument("--lr_total_iterations", type=int, default=10_000_000)
     parser.add_argument("--mlm_probability", type=float, default=0.15)
     parser.add_argument("--mask_replace_prob", type=float, default=0.8)
     parser.add_argument("--random_replace_prob", type=float, default=0.1)
@@ -80,16 +90,23 @@ def get_parser():
     # Pretrain specific
     parser.add_argument("--codon_weights_file", type=str, default=None)
     parser.add_argument("--bf16", action="store_true", default=False)
-    
+
     # Eval specific
     parser.add_argument("--extract-seq", action="store_true", default=False, help="For mutation prediction, whether to extract sequence.")
     parser.add_argument("--predictions_output_dir", type=str, default=None, help="For evaluation, the directory to write predictions to.")
-    parser.add_argument("--task_type", type=str, default=None, help="For evaluation, the task type to run.")
+    parser.add_argument(
+        "--task_type",
+        type=str,
+        choices=[task.value for task in TaskTypes],
+        default=None,
+        help="Inference task to run during evaluation.",
+    )
 
     # Finetune specific
     parser.add_argument("--checkpoint_path", type=str, default=None, help="Path to checkpoint for finetuning or evaluation.")
     parser.add_argument("--loss_type", choices=["regression", "classification"], default="regression")
     parser.add_argument("--label_col", type=str, default=None)
+    parser.add_argument("--value_col", type=str, default="value", help="Column name for target values when using CodonBertDataset.")
     parser.add_argument("--ref_seq_col", type=str, default="ref_seq")
     parser.add_argument("--resume_trainer_state", action="store_true", default=False)
     parser.add_argument("--checkpoint_every_n_train_steps", type=int, default=2000)
@@ -108,20 +125,26 @@ def get_parser():
     parser.add_argument("--val_check_interval", type=int, default=1000)
     parser.add_argument("--check_val_every_n_epoch", type=int, default=None, help="Run validation every n epochs. Overrides val_check_interval.")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Number of steps to accumulate gradients before performing a weight update.")
-    
+    parser.add_argument("--sharded_state_dict", action="store_true", default=False, help="Whether to shard the state dict.")
     parser.add_argument("--limit_val_batches", type=int, default=50)
     parser.add_argument("--log_every_n_steps", type=int, default=100)
     parser.add_argument("--gradient_clip_val", type=float, default=1.0)
-    
+
     return parser
 
 
 def main():
     parser = get_parser()
     args = parser.parse_args()
-    
-    if args.mode in ["eval"] and not args.checkpoint_path:
+
+    if args.mode == "eval" and not args.checkpoint_path:
         parser.error(f"--checkpoint_path is required for mode '{args.mode}'")
+    if args.mode == "eval" and not args.task_type:
+        parser.error("--task_type is required for mode 'eval'")
+
+    if args.data_path is None:
+        parser.error(f"--data_path is required for dataset '{args.dataset_name}'")
+
     if args.enable_wandb:
         missing = []
         if not args.project_name:
@@ -130,26 +153,32 @@ def main():
             missing.append("--entity")
         if missing:
             parser.error(f"{', '.join(missing)} is required when --enable_wandb is set")
-    cfg = get_config(args)
+
+    # Normalize mode for config (expects TrainerModes enum)
+    _mode_map = {"pretrain": TrainerModes.PRETRAIN, "finetune": TrainerModes.FINETUNE, "eval": TrainerModes.PREDICT}
+    args.mode = _mode_map[args.mode]
 
     out_dir = args.out_dir
     checkpoints_dir = args.checkpoints_dir if args.checkpoints_dir else os.path.join(out_dir, "checkpoints")
-    pretrained_ckpt_path = args.pretrained_ckpt_path   
+    args.checkpoints_dir = checkpoints_dir
+    if args.predictions_output_dir is None:
+        args.predictions_output_dir = os.path.join(out_dir, "predictions")
 
-    # exp_name = args.mode + "_" + args.exp_name
+    cfg = get_config(args)
+    pretrained_ckpt_path = args.pretrained_ckpt_path if args.pretrained_ckpt_path is not None else args.checkpoint_path
+
     exp_name = args.exp_name
-    
+
     cfg_dict = config_to_dict(cfg)
     config_built = fdl.build(cfg)
-    
-    # WandB handled directly by Lightning loggers via config; no external plugins needed
-    if not (args.enable_wandb and "WANDB_API_KEY" in os.environ):
-        log.info("WandB disabled or WANDB_API_KEY not found. Skipping WandB logging.")
+
+    if not args.enable_wandb:
+        log.info("WandB disabled. Using CSV logging.")
 
     cfg_dict["seed"] = args.seed
     cfg_dict["out_dir"] = out_dir
-    # Define task callable and kwargs
-    if args.mode == "pretrain":
+
+    if args.mode == TrainerModes.PRETRAIN:
         ckpt_path = os.path.join(checkpoints_dir, "last.ckpt")
         cfg_dict["ckpt_path"] = ckpt_path
         task_fn = train
@@ -160,10 +189,10 @@ def main():
             config_dict=cfg_dict,
             out_dir=out_dir,
         )
-    elif args.mode == "finetune":
+    elif args.mode == TrainerModes.FINETUNE:
         ckpt_path = os.path.join(checkpoints_dir, "last.ckpt")
         cfg_dict["ckpt_path"] = ckpt_path
-        cfg_dict["pretrained_ckpt_path"] = args.checkpoint_path
+        cfg_dict["pretrained_ckpt_path"] = pretrained_ckpt_path
         cfg_dict["resume_trainer_state"] = args.resume_trainer_state
         task_fn = finetune
         task_kwargs = dict(
@@ -175,8 +204,7 @@ def main():
             out_dir=out_dir,
             ckpt_path=ckpt_path,
         )
-        
-    elif args.mode == "eval":
+    elif args.mode == TrainerModes.PREDICT:
         task_fn = evaluate
         task_kwargs = dict(
             config=config_built,
@@ -185,6 +213,8 @@ def main():
             seed=args.seed,
             out_dir=out_dir,
         )
+    else:
+        raise ValueError(f"Unknown mode: {args.mode}")
 
     if args.dryrun:
         log.info("Dryrun mode: configuration constructed; skipping execution.")
@@ -195,4 +225,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

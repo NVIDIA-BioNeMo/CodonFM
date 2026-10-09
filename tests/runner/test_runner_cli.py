@@ -26,18 +26,14 @@ def test_runner_main_finetune_dispatch(mock_finetune, mock_build, mock_get_confi
         "--resume_trainer_state",
         "--finetune_strategy", "lora",
         "--lora",
+        "--dryrun",
     ]
     monkeypatch.setenv("WANDB_API_KEY", "")  # Ensure branch without W&B
     with patch.object(sys, "argv", argv):
         # Import inside to use patched argv
         import importlib
         mod = importlib.import_module("src.runner")
-        # Spy on parser to avoid running the job by setting dryrun
-        with patch.object(mod, "get_parser") as mock_get_parser:
-            parser = mod.get_parser()
-            parser.set_defaults(dryrun=True)
-            mock_get_parser.return_value = parser
-            mod.main()
+        mod.main()
 
     # Ensure config was constructed and finetune selected
     assert mock_get_config.called
@@ -170,4 +166,3 @@ def test_runner_wandb_requires_project_and_entity(monkeypatch):
         mod = importlib.import_module("src.runner")
         with pytest.raises(SystemExit):
             mod.main()
-

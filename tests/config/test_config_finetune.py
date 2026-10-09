@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import fiddle as fdl
 
-from src.config import get_model_config, get_trainer_config
+from src.config import create_strategy_from_config, get_model_config, get_trainer_config
 
 
 def _base_args(**overrides):
@@ -13,6 +13,7 @@ def _base_args(**overrides):
         mode="finetune",
         model_name="encodon_80m",
         max_steps=100,
+        lr_total_iterations=100,
         warmup_iterations=10,
         lr=1e-3,
         weight_decay=0.01,
@@ -26,6 +27,7 @@ def _base_args(**overrides):
         gradient_clip_val=1.0,
         gradient_accumulation_steps=1,
         enable_fsdp=False,
+        sharded_state_dict=False,
         check_val_every_n_epoch=None,
         val_check_interval=50,
         context_length=256,
@@ -46,7 +48,5 @@ def test_model_config_lora_auto_enable_when_strategy_lora():
 
 def test_trainer_strategy_for_finetune_uses_find_unused():
     args = _base_args()
-    trainer_kwargs = get_trainer_config(args)
+    trainer_kwargs = create_strategy_from_config(get_trainer_config(args))
     assert trainer_kwargs["strategy"] == "ddp_find_unused_parameters_true"
-
-

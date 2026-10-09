@@ -17,11 +17,13 @@ from typing import Any, Dict
 import os
 from pathlib import Path
 
-import torch
-import lightning.pytorch as L
-import fiddle as fdl
 from lightning.pytorch import seed_everything, Trainer
+from src.config import create_strategy_from_config
 from src.utils import RankedLogger
+from src.utils.checkpoints import (
+    install_legacy_checkpoint_aliases,
+    load_trusted_checkpoint,
+)
 from safetensors.torch import load_file
 
 # Initialize logger at module level so it's available to all functions
@@ -49,13 +51,14 @@ def train(config: Dict[str, Any],
                                               config["trainer"], \
                                               config["model"], \
                                               config["callbacks"]
+    trainer_kwargs = create_strategy_from_config(dict(trainer_kwargs))
     trainer = Trainer(**trainer_kwargs)
     
     if logger and hasattr(logger, "log_hyperparams"):
         logger.log_hyperparams(config_dict)
         
     if os.path.exists(ckpt_path):
-        state_dict = torch.load(ckpt_path, map_location="cpu")
+        state_dict = load_trusted_checkpoint(ckpt_path)
         model.configure_model(state_dict=state_dict.get("state_dict"))
     else:
         model.configure_model()
@@ -63,7 +66,17 @@ def train(config: Dict[str, Any],
     trainer.callbacks = list(callbacks.values())
     trainer.logger = logger
     logging.info(f"Starting pre-training from {ckpt_path}")
-    trainer.fit(model, datamodule=data, ckpt_path=ckpt_path if os.path.exists(ckpt_path) else None)
+    trainer_ckpt_path = ckpt_path if os.path.exists(ckpt_path) else None
+    fit_kwargs = {}
+    if trainer_ckpt_path is not None:
+        install_legacy_checkpoint_aliases()
+        fit_kwargs["weights_only"] = False
+    trainer.fit(
+        model,
+        datamodule=data,
+        ckpt_path=trainer_ckpt_path,
+        **fit_kwargs,
+    )
 
 def finetune(config: Dict[str, Any],
              pretrained_ckpt_path: str,
@@ -90,21 +103,28 @@ def finetune(config: Dict[str, Any],
                                               config["trainer"], \
                                               config["model"], \
                                               config["callbacks"]
+    trainer_kwargs = create_strategy_from_config(dict(trainer_kwargs))
     trainer = Trainer(**trainer_kwargs)
     
     if logger and hasattr(logger, "log_hyperparams"):
         logger.log_hyperparams(config_dict)
         
-    if os.path.exists(pretrained_ckpt_path) and not os.path.exists(ckpt_path):
+    pretrained_exists = bool(pretrained_ckpt_path) and os.path.exists(pretrained_ckpt_path)
+    checkpoint_exists = bool(ckpt_path) and os.path.exists(ckpt_path)
+    if pretrained_exists and not checkpoint_exists:
         # first time finetuning from a pretrained checkpoint: can be a .safetensors or a .ckpt file.
         ckpt_suffix = Path(pretrained_ckpt_path).suffix.lower()
         if ckpt_suffix == ".safetensors":
             state_dict = load_file(str(Path(pretrained_ckpt_path)))
             model.configure_model(state_dict=state_dict)
             trainer_ckpt_path = None
-        else:
-            state_dict = torch.load(pretrained_ckpt_path, map_location="cpu")
+        elif ckpt_suffix == ".ckpt":
+            state_dict = load_trusted_checkpoint(pretrained_ckpt_path)
             model.configure_model(state_dict=state_dict.get("state_dict"))
+        else:
+            raise ValueError(
+                "Pretrained checkpoint must be a .ckpt or .safetensors file."
+            )
     else:
         logging.info(f"No pretrained checkpoint found at {pretrained_ckpt_path}, starting from scratch")
         model.configure_model()
@@ -112,16 +132,27 @@ def finetune(config: Dict[str, Any],
     trainer.callbacks = list(callbacks.values())
     trainer.logger = logger
     
-    if resume_trainer_state and os.path.exists(pretrained_ckpt_path) and not os.path.exists(ckpt_path):
-        # Assert a *.ckpt file is provided when resuming trainer state.
-        assert Path(pretrained_ckpt_path).suffix.lower() == ".ckpt", "Pretrained checkpoint must be a *.ckpt file when resuming trainer state."
+    if resume_trainer_state and pretrained_exists and not checkpoint_exists:
+        if Path(pretrained_ckpt_path).suffix.lower() != ".ckpt":
+            raise ValueError(
+                "Pretrained checkpoint must be a .ckpt file when resuming trainer state."
+            )
         trainer_ckpt_path = pretrained_ckpt_path
     else:
-        trainer_ckpt_path = ckpt_path if os.path.exists(ckpt_path) else None
+        trainer_ckpt_path = ckpt_path if checkpoint_exists else None
     
     logging.info(f"Starting finetuning from {trainer_ckpt_path} \
         with resume_trainer_state={resume_trainer_state} and ckpt_path={ckpt_path}")
-    trainer.fit(model, datamodule=data, ckpt_path=trainer_ckpt_path)
+    fit_kwargs = {}
+    if trainer_ckpt_path is not None:
+        install_legacy_checkpoint_aliases()
+        fit_kwargs["weights_only"] = False
+    trainer.fit(
+        model,
+        datamodule=data,
+        ckpt_path=trainer_ckpt_path,
+        **fit_kwargs,
+    )
 
 
 def evaluate(
@@ -149,6 +180,7 @@ def evaluate(
                                           config["model"], \
                                           config["callbacks"]
     
+    trainer_kwargs = create_strategy_from_config(dict(trainer_kwargs))
     trainer = Trainer(**trainer_kwargs)
     
     if logger and hasattr(logger, "log_hyperparams"):
@@ -157,15 +189,12 @@ def evaluate(
     model.configure_model()
 
     data.setup("test")
-    # Safetensors files contain model weights only.  Loading one again through
-    # torch.load() raises an unpickling error, so only inspect Lightning
-    # checkpoints for an optional datamodule state.
     if (
         os.path.exists(model_ckpt_path)
         and Path(model_ckpt_path).suffix.lower() == ".ckpt"
     ):
         logging.info(f"Loading dataset checkpoint from {model_ckpt_path}")
-        checkpoint = torch.load(model_ckpt_path, map_location="cpu")
+        checkpoint = load_trusted_checkpoint(model_ckpt_path)
         datamodule_state = checkpoint.get(data.__class__.__qualname__)
         if datamodule_state is not None:
             data.load_state_dict(datamodule_state)

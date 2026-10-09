@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import importlib
-import argparse
+import functools
 from typing import Any, Dict
 
 import fiddle as fdl
@@ -25,21 +24,20 @@ from lightning.pytorch.callbacks import (
     ModelSummary,
     LearningRateMonitor,
 )
-from lightning.pytorch import Trainer
-from lightning.pytorch.loggers import WandbLogger, CSVLogger
+from lightning.pytorch.loggers import CSVLogger, WandbLogger
 import torch
+from lightning.pytorch.strategies import FSDPStrategy
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 
 from src.data.datamodule import CodonFMDataModule
-from src.data import preprocess
+from src.data.metadata import TrainerModes
 from src.tokenizer import Tokenizer
 from src.utils.grad_norm_callback import GradientNormLogger
 from src.models.encodon_pl import EncodonPL
+from src.models.components.encoder_layer import EncoderLayer
 from src.utils.scheduler import linear_scheduler_with_warmup_lr_lambda
 from src.utils.pred_writer import PredWriter
 from src.inference.encodon import EncodonInference
-
- 
-
 
 # Datasets
 def get_dataset_config(args: Any, process_item_cfg: fdl.Partial) -> fdl.Config:
@@ -57,6 +55,11 @@ def get_dataset_config(args: Any, process_item_cfg: fdl.Partial) -> fdl.Config:
     """
     
     class_name = args.dataset_name
+    if args.mode == TrainerModes.PREDICT and class_name == "CodonMemmapDataset":
+        raise ValueError(
+            "CodonMemmapDataset cannot use PREDICT mode with "
+            "train_val_test_ratio=None."
+        )
     if class_name == "CodonMemmapDataset":
         module_path = "src.data.codon_memmap_dataset"
     elif class_name == "MutationDataset":
@@ -73,8 +76,7 @@ def get_dataset_config(args: Any, process_item_cfg: fdl.Partial) -> fdl.Config:
         raise ValueError(f"Could not import dataset '{args.dataset_name}'. Please check the name.") from e
 
     tokenizer_cfg = fdl.Config(Tokenizer, model_max_length=args.context_length)
-    
-    if args.mode == "eval":
+    if args.mode == TrainerModes.PREDICT:
         args.train_val_test_ratio = None
 
     common_args = {
@@ -92,6 +94,7 @@ def get_dataset_config(args: Any, process_item_cfg: fdl.Partial) -> fdl.Config:
             groups_to_use=args.groups_to_use,
             taxid_exclusion_file=getattr(args, "taxid_exclusion_file", None),
             split_name_prefix=getattr(args, "split_name_prefix", ""),
+            pretraining_task="mlm",
         )
     elif class_name == "MutationDataset":
         dataset_cfg = fdl.Partial(
@@ -100,6 +103,7 @@ def get_dataset_config(args: Any, process_item_cfg: fdl.Partial) -> fdl.Config:
             label_col=getattr(args, "label_col", None),
             extract_seq=getattr(args, "extract_seq", False),
             ref_seq_col=getattr(args, "ref_seq_col", "ref_seq"),
+            task="mlm",
         )
     elif class_name == "CodonBertDataset":
         dataset_cfg = fdl.Partial(
@@ -107,6 +111,8 @@ def get_dataset_config(args: Any, process_item_cfg: fdl.Partial) -> fdl.Config:
             data_path=args.data_path,
             tokenizer=tokenizer_cfg,
             process_item=process_item_cfg,
+            value_col=args.value_col,
+            ref_seq_col=args.ref_seq_col,
         )
     else:
         print(f"Warning: Using generic config for dataset '{args.dataset_name}'.")
@@ -150,7 +156,7 @@ def get_callbacks_config(args: Any) -> Dict[str, fdl.Config]:
         "grad_norm_callback": fdl.Config(GradientNormLogger,
                                          log_every_n_steps=100),
     }
-    if args.mode == "eval":
+    if args.mode == TrainerModes.PREDICT:
         callbacks["pred_writer"] = fdl.Config(
             PredWriter,
             output_dir=args.predictions_output_dir,
@@ -217,7 +223,7 @@ def get_data_config(args: Any) -> fdl.Config:
         pin_memory=False,
         persistent_workers=False,
         world_size=args.num_nodes * args.num_gpus,
-        is_evaluation=args.mode == "eval",
+        mode = args.mode,
     )
 
 # Logger
@@ -263,7 +269,7 @@ MODEL_ARCHITECTURES: Dict[str, Dict[str, Any]] = {
         "intermediate_size": 8192,
         "num_attention_heads": 16,
         "num_hidden_layers": 18,
-    }
+    },
 }
 
 def get_model_config(args: Any) -> fdl.Config:
@@ -281,20 +287,28 @@ def get_model_config(args: Any) -> fdl.Config:
     Raises:
         ValueError: If the model name or mode is unrecognized.
     """
+
     arch = MODEL_ARCHITECTURES.get(args.model_name)
     if arch is None:
         raise ValueError(f"Unknown model name: {args.model_name}")
-
-    if args.mode == "pretrain" or args.mode == "finetune":
+    if args.mode == TrainerModes.PRETRAIN or args.mode == TrainerModes.FINETUNE:
         scheduler = fdl.Partial(
             torch.optim.lr_scheduler.LambdaLR,
             lr_lambda=fdl.Partial(
                 linear_scheduler_with_warmup_lr_lambda,
-                total_iterations=args.max_steps,
+                total_iterations=args.lr_total_iterations,
                 warmup_iterations=args.warmup_iterations,
             ),
         )
-    
+        extra_kwargs = {
+            "loss_type": args.loss_type,
+            "num_classes": getattr(args, "num_classes", 2),
+            "use_downstream_head": getattr(args, "use_downstream_head", False),
+            "cross_attention_hidden_dim": getattr(args, "cross_attention_hidden_dim", 256),
+            "cross_attention_num_heads": getattr(args, "cross_attention_num_heads", 8),
+            "max_position_embeddings": getattr(args, "context_length", 2048),
+            "finetune_strategy": args.finetune_strategy,
+        }
         return fdl.Config(
             EncodonPL,
             optimizer=fdl.Partial(
@@ -307,20 +321,19 @@ def get_model_config(args: Any) -> fdl.Config:
             lora_alpha=getattr(args, 'lora_alpha', 32.0),
             lora_r=getattr(args, 'lora_r', 16),
             lora_dropout=getattr(args, 'lora_dropout', 0.1),
-            finetune_strategy=args.finetune_strategy,
-            loss_type=args.loss_type,
-            num_classes=getattr(args, 'num_classes', 2),
-            use_downstream_head=getattr(args, 'use_downstream_head', False),
-            cross_attention_hidden_dim=getattr(args, 'cross_attention_hidden_dim', 256),
-            cross_attention_num_heads=getattr(args, 'cross_attention_num_heads', 8),
-            max_position_embeddings=getattr(args, 'context_length', 2048),
             **arch,
+            **extra_kwargs,
         )
-    elif args.mode == "eval":
+    elif args.mode == TrainerModes.PREDICT:
+        
+        config_kwargs = {
+            "model_path": args.checkpoint_path,
+            "task_type": args.task_type,
+        }
+        
         return fdl.Config(
             EncodonInference,
-            model_path=args.checkpoint_path,
-            task_type=args.task_type,
+            **config_kwargs
         )
     else:
         raise ValueError(f"Unknown mode: {args.mode}")
@@ -340,7 +353,11 @@ def get_trainer_config(args: Any) -> Dict[str, Any]:
         devices=args.num_gpus,
         max_steps=args.max_steps,
         default_root_dir=args.out_dir,
-        strategy="fsdp" if args.enable_fsdp else "ddp" if args.mode != "finetune" else "ddp_find_unused_parameters_true",
+        _strategy_type="fsdp" if args.enable_fsdp else "ddp" if args.mode != TrainerModes.FINETUNE else "ddp_find_unused_parameters_true",
+        _fsdp_config={
+            "transformer_layer_cls_names": ["EncoderLayer"],
+            "state_dict_type": "sharded" if args.sharded_state_dict else "full",
+        } if args.enable_fsdp else None,
         precision="bf16-mixed" if getattr(args, 'bf16', False) else "32-true",
         limit_val_batches=args.limit_val_batches,
         log_every_n_steps=args.log_every_n_steps,
@@ -356,6 +373,39 @@ def get_trainer_config(args: Any) -> Dict[str, Any]:
     else:
         trainer_kwargs['val_check_interval'] = args.val_check_interval
     
+    return trainer_kwargs
+
+def create_strategy_from_config(trainer_kwargs: Dict[str, Any]) -> Any:
+    """Creates the strategy object from trainer configuration.
+    
+    This function is called at task execution time to instantiate the strategy
+    from the serializable configuration parameters.
+    """
+    strategy_type = trainer_kwargs.pop("_strategy_type", "ddp")
+    fsdp_config = trainer_kwargs.pop("_fsdp_config", None)
+    
+    if strategy_type == "fsdp" and fsdp_config:        
+        # Convert class names to actual class objects
+        transformer_layer_cls_names = fsdp_config["transformer_layer_cls_names"]
+        transformer_layer_cls = set()
+        for cls_name in transformer_layer_cls_names:
+            if cls_name == "EncoderLayer":
+                transformer_layer_cls.add(EncoderLayer)
+        
+        
+        strategy = FSDPStrategy(
+            auto_wrap_policy=functools.partial(
+                transformer_auto_wrap_policy,
+                transformer_layer_cls=transformer_layer_cls,
+            ),
+            state_dict_type=fsdp_config["state_dict_type"],
+            forward_prefetch=True,
+            limit_all_gathers=True,
+        )
+    else:
+        strategy = strategy_type
+    
+    trainer_kwargs["strategy"] = strategy
     return trainer_kwargs
 
 # Main config

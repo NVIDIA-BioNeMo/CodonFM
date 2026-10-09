@@ -35,7 +35,6 @@ def test_finetune_with_safetensors_loads_and_uses_none_ckpt(mock_exists, MockTra
     # Pretend pretrained safetensors exists and target ckpt does not
     pretrained = str(tmp_path / "pretrained.safetensors")
     ckpt_path = str(tmp_path / "last.ckpt")
-    
     def _exists(p):
         if p == pretrained:
             return True
@@ -69,16 +68,15 @@ def test_finetune_with_safetensors_loads_and_uses_none_ckpt(mock_exists, MockTra
     assert k.get("ckpt_path") is None
 
 
-@patch("src.tasks.torch.load")
+@patch("src.tasks.load_trusted_checkpoint")
 @patch("src.tasks.Trainer")
 @patch("src.tasks.os.path.exists")
-def test_finetune_with_ckpt_loads_and_maybe_resumes(mock_exists, MockTrainer, mock_torch_load, tmp_path):
+def test_finetune_with_ckpt_loads_and_maybe_resumes(mock_exists, MockTrainer, mock_load_trusted_checkpoint, tmp_path):
     config = _make_min_config()
     pretrained = str(tmp_path / "pretrained.ckpt")
     ckpt_path = str(tmp_path / "last.ckpt")
 
     # Pretrained exists, target ckpt does not
-    
     def _exists(p):
         if p == pretrained:
             return True
@@ -86,7 +84,7 @@ def test_finetune_with_ckpt_loads_and_maybe_resumes(mock_exists, MockTrainer, mo
             return False
         return Path(p).exists()
     mock_exists.side_effect = _exists
-    mock_torch_load.return_value = {"state_dict": {"model.layer": 1}}
+    mock_load_trusted_checkpoint.return_value = {"state_dict": {"model.layer": 1}}
 
     trainer = MagicMock()
     MockTrainer.return_value = trainer
@@ -130,7 +128,6 @@ def test_finetune_resume_trainer_state_asserts_on_non_ckpt(mock_exists, MockTrai
     pretrained = str(tmp_path / "pretrained.safetensors")
     ckpt_path = str(tmp_path / "last.ckpt")
 
-    
     def _exists(p):
         if p == pretrained:
             return True
@@ -140,7 +137,7 @@ def test_finetune_resume_trainer_state_asserts_on_non_ckpt(mock_exists, MockTrai
     mock_exists.side_effect = _exists
     mock_load_file.return_value = {}
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="must be a .ckpt file"):
         finetune_fn(
             config=config,
             pretrained_ckpt_path=pretrained,
@@ -173,5 +170,3 @@ def test_finetune_without_pretrained_starts_from_scratch(mock_exists, MockTraine
     config["model"].configure_model.assert_called_once()
     args, kwargs = config["model"].configure_model.call_args
     assert "state_dict" not in kwargs
-
-

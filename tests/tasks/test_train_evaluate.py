@@ -85,7 +85,8 @@ def test_evaluate_with_ckpt_loads_datamodule_and_sets_counter(MockTrainer, tmp_p
 
     model_ckpt_path = str(tmp_path / "model_state.ckpt")
     # write a small checkpoint
-    torch.save({"any": "thing"}, model_ckpt_path)
+    datamodule_state = {"consumed_samples": 8}
+    torch.save({"MagicMock": datamodule_state}, model_ckpt_path)
 
     trainer = MagicMock()
     MockTrainer.return_value = trainer
@@ -99,7 +100,7 @@ def test_evaluate_with_ckpt_loads_datamodule_and_sets_counter(MockTrainer, tmp_p
     )
 
     # datamodule loads state_dict and prediction_counter set
-    config["data"].load_state_dict.assert_called_once()
+    config["data"].load_state_dict.assert_called_once_with(datamodule_state)
     assert config["model"].prediction_counter == 777
 
     trainer.predict.assert_called_once()
@@ -121,5 +122,3 @@ def test_evaluate_without_ckpt_skips_loading(MockTrainer, tmp_path):
 
     config["data"].load_state_dict.assert_not_called()
     trainer.predict.assert_called_once()
-
-

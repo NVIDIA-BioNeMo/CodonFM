@@ -33,9 +33,8 @@ class TestNemorunUtils:
             a=1,
             b=fdl.Partial(DummyClass, a=2, b=3)
         )
-        
         d = config_to_dict(cfg)
-        
+
         expected_dict = {
             "a": 1,
             "b": {
