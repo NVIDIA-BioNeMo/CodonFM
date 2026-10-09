@@ -6,6 +6,7 @@ Our primary model family, Encodon, uses masked language modeling over codons wit
 
 The checkpoints can also be found on NGC [here](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/nv_codonfm_encodon).
 
+**Release v1.1 security scope:** This branch contains the Encodon model family and the release package and container security updates.
 
 ## Methodology and Results
 
@@ -71,6 +72,7 @@ codon-fm/
 │   └── pretraining/ — Encodon pretraining
 ├── data_scripts/ — data download and curation tools
 ├── notebooks/ — analysis and evaluation notebooks
+├── pyproject.toml — package metadata, dependencies, and NGC image constraints
 ├── env.example — sample env vars
 └── README.md — repo guide
 ```
@@ -80,8 +82,8 @@ To run the scripts in this repository, we recommend using the provided Docker se
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/NVIDIA-Digital-Bio/CodonFM
-cd codon-fm
+git clone https://github.com/NVIDIA-BioNeMo/CodonFM
+cd CodonFM
 ```
 ### 2. Docker Setup
 
@@ -97,7 +99,7 @@ This script will:
 1.  Build the development Docker image using the `development` target in the `Dockerfile`.
 2.  Pass your user and group IDs to the container to avoid permission issues with mounted files.
 3.  Stop and remove any existing container with the same name.
-4.  Launch a new container with your local code mounted at `/workspace`, GPU access, host networking, and common directories for data and SSH keys.
+4.  Launch a new container with your local code mounted at `/workspace`, GPU access, isolated networking, a published Jupyter port, and the configured data directories.
 
 You can also customize the data and checkpoint directory paths by passing arguments:
 ```bash
@@ -108,7 +110,7 @@ You will be dropped into a `bash` shell inside the container as a non-root user.
 
 #### Evaluation Notebooks 📓
 
-A series of notebooks are provided in the `notebooks` directory show casing multiple use cases such as zero-shot variant prediction and finetuning on downstream tasks. See a brief overview below:
+A series of notebooks in the `notebooks` directory show zero-shot variant prediction and downstream tasks that train Random Forest regressors on pretrained Encodon embeddings. See a brief overview below:
 
 | Notebook | Description |
 |---|---|
@@ -117,9 +119,9 @@ A series of notebooks are provided in the `notebooks` directory show casing mult
 | [1-Zero-Shot-Mutation-Variant-DDD-ASD.ipynb](notebooks/1-Zero-Shot-Mutation-Variant-DDD-ASD.ipynb) | Zero-shot scoring on Deciphering Developmental Disorders (DDD) and autism spectrum disorder (ASD) cohort study, which catalogs genetic mutations linked to rare pediatric and developmental diseases, to evaluate separation of healthy versus disease coh on coding sequence context.|
 | [2-Zero-Shot-Mutation-Variant-Clinvar-Alphamissense.ipynb](notebooks/2-Zero-Shot-Mutation-Variant-Clinvar-Alphamissense.ipynb) | Zero-shot evaluation on ClinVar missense variants classifying benign vs. pathogenic |
 | [3-Zero-Shot-Mutation-Variant-Clinvar-Synonymous.ipynb](notebooks/3-Zero-Shot-Mutation-Variant-Clinvar-Synonymous.ipynb) | Zero-shot evaluation on ClinVar synonymous variants evaluating how the models separate benign versus pathogenic synonymous mutations.|
-| [4-EnCodon-Downstream-Task-riboNN.ipynb](notebooks/4-EnCodon-Downstream-Task-riboNN.ipynb) | Predicts ribosome profiling signal intensity along coding sequences, evaluating how well models capture translation efficiency and codon-level regulation from sequence context. |
-| [5-EnCodon-Downstream-Task-mRFP-expression.ipynb](notebooks/5-EnCodon-Downstream-Task-mRFP-expression.ipynb) | Predicts fluorescent protein expression levels (mRFP) from coding sequences, testing how accurately models capture codon-dependent effects on translation efficiency and protein abundance.|
-| [6-EnCodon-Downstream-Task-mRNA-stability.ipynb](notebooks/6-EnCodon-Downstream-Task-mRNA-stability.ipynb) | Predicts mRNA stability from coding sequences evaluating how the models associate codon composition with stability of mRNA.|
+| [Encodon riboNN notebook](notebooks/4-EnCodon-Downstream-Task-riboNN.ipynb) | Predicts ribosome profiling signal intensity along coding sequences, evaluating how well models capture translation efficiency and codon-level regulation from sequence context. |
+| [Encodon mRFP expression notebook](notebooks/5-EnCodon-Downstream-Task-mRFP-expression.ipynb) | Predicts fluorescent protein expression levels (mRFP) from coding sequences, testing how accurately models capture codon-dependent effects on translation efficiency and protein abundance.|
+| [Encodon mRNA stability notebook](notebooks/6-EnCodon-Downstream-Task-mRNA-stability.ipynb) | Predicts mRNA stability from coding sequences evaluating how the models associate codon composition with stability of mRNA.|
 
 
 ### Data 📊
@@ -132,7 +134,9 @@ The data curation tools live under `data_scripts/data_curation/`.
 - Filtering resources: `data_scripts/data_curation/taxids_to_remove_bac.json` lists bacterial taxids to exclude during curation.
 - Recommended environment: use the provided dev container (`bash run_dev.sh`), then open the notebook in Jupyter/VS Code and execute the cells.
 
-Outputs from the notebook (cleaned CDS files and metadata tables) can be transformed into training-ready formats memmap creation script in `src/data/data_scripts/ncbi_memmap_dataset_batched.py` on the output of the `src/data/data_curation/` notebook. This can then be consumed by`CodonMemmapDataset`.
+Outputs from the notebook (cleaned CDS files and metadata tables) can be transformed into training-ready memory-mapped data with `data_scripts/ncbi_memmap_dataset_batched.py`. The resulting files can then be consumed by `CodonMemmapDataset`.
+
+`CodonMemmapDataset` also requires a sequence cluster file, `allSeqClusterIdx.npy`, in the data directory to build train/val/test splits. Generate it with `data_scripts/data_curation/allseq_clustering_for_splits.ipynb` (see [data_scripts/README.md](data_scripts/README.md)).
 
 #### Evaluation Datasets
 
@@ -145,7 +149,7 @@ Outputs from the notebook (cleaned CDS files and metadata tables) can be transfo
   - After preprocessing, use the task-specific notebooks in `notebooks/` (e.g., `0-...CancerHotspot.ipynb` and `1-...DDD-ASD.ipynb`) which consume the harmonized outputs produced by the preprocessing notebook.
 
 ### Running Training/Finetuning/Evaluation
-The main entry point is `src/runner.py` which supports three modes:
+The main entry point is available as either `python -m src.runner` or the installed `codon-fm` command. It supports three modes:
 #### Pre-training
 
 The explicit scripts used to train the released checkpoints are referenced in [Pre-trained Models](#pre-trained-models)
@@ -176,9 +180,10 @@ Optional path overrides:
 - `codon_sequence`: Constructs a codon sequence that can be inputed into the model.
 
 **Available `--dataset_name` options:**
-- `CodonMemmapDataset`: dataset to support memory-mapped pre-training dataset used for pre-training
-- `MutationDataset`: dataset for mutation prediction
+- `CodonMemmapDataset`: memory-mapped pre-training dataset for Encodon.
+- `MutationDataset`: dataset for mutation prediction.
 - `CodonBertDataset`: dataset to ingest codon sequences.
+**Available `--model_name` options (examples):** `encodon_80m`, `encodon_600m`, `encodon_1b`.
 
 #### Fine-tuning
 The publicly available checkpoints can be finetuned using the finetuning options.
@@ -222,6 +227,8 @@ python -m src.runner eval \
     --model_name <model_size> \
     --checkpoint_path <path_to_checkpoint> \
     --data_path <path_to_data> \
+    --process_item <process-item-to-use> \
+    --dataset_name <dataset-name> \
     --task_type <task_type> \
     --predictions_output_dir <output_directory>
 ```
@@ -232,7 +239,7 @@ To use Wandb with CodonFM, set your Weights & Biases API key for logging in the 
 
 ```bash
 # WANDB key (optional; only needed if enabling --enable_wandb)
-WANDB_API_KEY=your_wandb_api_key
+export WANDB_API_KEY="your_wandb_api_key"
 ```
 You can then source the .env file.
 
@@ -240,7 +247,14 @@ You can then source the .env file.
 source .env
 ```
 
-When launching runs, enable WandB logging by passing `--enable_wandb` and providing `--project_name` and `--entity`. If these are omitted, WandB logging will be skipped.
+When launching runs, enable WandB logging by passing `--enable_wandb` with `--project_name` and `--entity`. Without `--enable_wandb`, the runner uses CSV logging; with it, both names are required.
+
+Set your own project and entity values before running a pretraining script:
+
+```bash
+export WANDB_PROJECT="your_project_name"
+export WANDB_ENTITY="your_entity_name"
+```
 
 
 ## Testing

@@ -22,7 +22,7 @@ Global <br>
 - Variant Interpretation for pathogenicity: To identify and prioritize functional synonymous and missense variants in the context of diseases. <br>
 
 ## Release Date:  <br>
-Github 10/27/2025 via https://github.com/NVIDIA-Digital-Bio/CodonFM <br>
+Github 10/27/2025 via https://github.com/NVIDIA-BioNeMo/CodonFM <br>
 Hugging Face 10/27/2025 via:
 - Random Mask
     - https://huggingface.co/nvidia/NV-CodonFM-Encodon-1B-v1
@@ -68,7 +68,7 @@ Our AI models are designed and/or optimized to run on NVIDIA GPU-accelerated sys
 
 ## Software Integration:
 **Runtime Engine(s):**
-* PyTorch - 2.5.1
+* PyTorch - 2.14.0a0+b2c75dd062.nv26.9.68203377 (release v1.1 container)
 
 
 **Supported Hardware Microarchitecture Compatibility:** <br>
@@ -105,7 +105,7 @@ The integration of foundation and fine-tuned models into AI systems requires add
 
 **Properties:** Coding sequences from the NCBI RefSeq database (release 2024-04) were used for training. A total of >130M non-viral protein-coding sequences from >22,000 species were included, comprising >2,000 eukaryotes. Sequences not divisible by three or containing ambiguous bases were removed. Taxonomy-level deduplication using MMSeqs eliminated redundant entries, and coding sequences from bacteria pathogenic to humans were excluded. The resulting dataset was partitioned into nine species groups: primates, archaea, bacteria, fungi, invertebrate, plant, protozoa, non-primate mammals, and non-mammal vertebrates. Sequences were clustered by similarity and then split into training and validation sets with stratification across groups to ensure balanced representation.
 
-Encodon models use codon-level tokenization, processing input sequences of up to 2,046 codons. Each model was trained using a masked language modeling (MLM) objective, where randomly masked codons were predicted from their context. The Encodon pretraining dataset was sorted based on sequence taxonomy to maintain species balance, and sequence subsets could be resampled dynamically. <br>
+Encodon models use codon-level tokenization, processing input sequences of up to 2,046 codons. Each model was trained using a masked language modeling (MLM) objective, predicting masked codons from their context. The 80M, 600M, and standard 1B variants use random masking; the Cdwt 1B variant uses codon-frequency-weighted masking. The Encodon pretraining dataset was sorted based on sequence taxonomy to maintain species balance, and sequence subsets could be resampled dynamically. <br>
 
 **Non-Audio, Image, Text Training Data Size:**  NCBI RefSeq genomes FTP directory currently contains over 395,000 genomes totaling approximately 3.3 terabases (Tb)
 
