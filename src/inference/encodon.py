@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import Dict
 
 import torch
@@ -30,14 +29,16 @@ from src.inference.model_outputs import (
     MutationPredictionOutput,
     FitnessPredictionOutput,
     EmbeddingOutput,
-    DownstreamPredictionOutput
+    DownstreamPredictionOutput,
 )
 from src.models.encodon_pl import EncodonPL
 from src.data.metadata import MetadataFields
+from src.utils.checkpoints import load_trusted_checkpoint
 
 
 class EncodonInference(BaseInference):
     """Inference class for Encodon models."""
+    
     def configure_model(self):
         """Loads the model and tokenizer for inference."""
         if self.model is not None:
@@ -82,19 +83,28 @@ class EncodonInference(BaseInference):
             if dist.is_initialized():
                 broadcasted_objects = [None, None]
                 if dist.get_rank() == 0:
-                    ckpt = torch.load(self.model_path, map_location="cpu")
+                    ckpt = load_trusted_checkpoint(self.model_path)
                     hparams = ckpt.get("hyper_parameters")
                     state_dict = ckpt.get("state_dict")
                     broadcasted_objects = [state_dict, hparams]
                 dist.broadcast_object_list(broadcasted_objects, src=0)
                 state_dict, hparams = broadcasted_objects
             else:
-                ckpt = torch.load(self.model_path, map_location="cpu")
+                ckpt = load_trusted_checkpoint(self.model_path)
                 hparams = ckpt.get("hyper_parameters")
                 state_dict = ckpt.get("state_dict")
         else:
             raise ValueError(
                 f"Unsupported model file type: {suffix}. Expected .ckpt or .safetensors"
+            )
+
+        if hparams is None:
+            raise ValueError(
+                f"Failed to load hyperparameters from checkpoint at '{self.model_path}'."
+            )
+        if state_dict is None:
+            raise ValueError(
+                f"Failed to load state_dict from checkpoint at '{self.model_path}'."
             )
 
         # The hparams from lightning checkpoint might be nested.
@@ -114,11 +124,23 @@ class EncodonInference(BaseInference):
         self.model.eval()
         
     def predict_mlm(self, batch, ids=None) -> Dict[str, np.ndarray]:
-        """Predicts masked tokens in a batch."""
+        """
+        Predict masked tokens in a batch.
+        
+        Args:
+            batch: Dictionary with INPUT_MASK and LABELS fields.
+            ids: Optional sequence identifiers.
+            
+        Returns:
+            MaskedLMOutput with predictions and labels at masked positions.
+        """
+        if MetadataFields.INPUT_MASK not in batch:
+            raise ValueError(f"Batch missing required field: {MetadataFields.INPUT_MASK}")
+        if MetadataFields.LABELS not in batch:
+            raise ValueError(f"Batch missing required field: {MetadataFields.LABELS}")
+        
         with torch.no_grad():
-            output = self.model(
-                batch
-            )
+            output = self.model(batch)
             preds = output.logits
             if preds.dtype != torch.float:
                 preds = preds.float()
@@ -127,34 +149,52 @@ class EncodonInference(BaseInference):
             y = y[mask]
             preds = preds[mask]
             preds = preds.cpu().numpy()
-            if len(y) > 0:
-                y = y.cpu().numpy()
+            y = y.cpu().numpy()
             
         return MaskedLMOutput(preds=preds, labels=y, ids=ids)
         
     def predict_mutation(self, batch, ids=None) -> Dict[str, np.ndarray]:
         """
-        Predicts the effect of a mutation by calculating the log-likelihood ratio 
-        of the reference codon vs. the alternative codon at the mutation site.
+        Score variants by comparing log probabilities at the mutation position.
+        
+        Args:
+            batch: Dictionary with REF_CODON_TOKS, ALT_CODON_TOKS, MUTATION_TOKEN_IDX.
+            ids: Optional sequence identifiers.
+            
+        Returns:
+            MutationPredictionOutput with ref/alt likelihoods and ratios.
         """
+        required_fields = [
+            MetadataFields.REF_CODON_TOKS,
+            MetadataFields.ALT_CODON_TOKS,
+            MetadataFields.MUTATION_TOKEN_IDX
+        ]
+        for field in required_fields:
+            if field not in batch:
+                raise ValueError(f"Batch missing required field for mutation prediction: {field}")
+        
         with torch.no_grad():
-            output = self.model(
-                batch
-            )
+            output = self.model(batch)
             preds = output.logits
             if preds.dtype != torch.float:
                 preds = preds.float()
-            ref_toks = batch[MetadataFields.REF_CODON_TOKS]
-            alt_toks = batch[MetadataFields.ALT_CODON_TOKS]
+            ref_toks = batch[MetadataFields.REF_CODON_TOKS].view(-1)
+            alt_toks = batch[MetadataFields.ALT_CODON_TOKS].view(-1)
             mutation_token_idx = batch[MetadataFields.MUTATION_TOKEN_IDX].view(-1)
-            # Get predictions only for the mutated token positions.
-            preds = preds[torch.arange(preds.shape[0]), mutation_token_idx, :]
-            # Convert logits to log-probabilities.
+            
+            seq_len = preds.shape[1]
+            if (mutation_token_idx >= seq_len).any() or (mutation_token_idx < 0).any():
+                raise ValueError(
+                    f"mutation_token_idx contains out-of-bounds indices. "
+                    f"Valid range: [0, {seq_len-1}], got min={mutation_token_idx.min().item()}, "
+                    f"max={mutation_token_idx.max().item()}"
+                )
+            
+            batch_indices = torch.arange(preds.shape[0], device=preds.device)
+            preds = preds[batch_indices, mutation_token_idx, :]
             preds = torch.nn.functional.log_softmax(preds, dim=-1)
-            # Get the log-likelihoods for the reference and alternate codons.
-            ref_likelihoods = preds[torch.arange(preds.shape[0]), ref_toks]
-            alt_likelihoods = preds[torch.arange(preds.shape[0]), alt_toks]
-            # The likelihood ratio is the difference in log-likelihoods.
+            ref_likelihoods = preds[batch_indices, ref_toks]
+            alt_likelihoods = preds[batch_indices, alt_toks]
             likelihood_ratios = ref_likelihoods - alt_likelihoods
         return MutationPredictionOutput(
             ref_likelihoods=ref_likelihoods.cpu().numpy(),
@@ -162,112 +202,100 @@ class EncodonInference(BaseInference):
             likelihood_ratios=likelihood_ratios.cpu().numpy(),
             ids=ids,
         )
-        
+
     def extract_embeddings(self, batch, ids=None) -> Dict[str, np.ndarray]:
-        """Extracts embeddings for a batch of sequences."""
+        """
+        Extract sequence embeddings from the [CLS] token.
+        
+        Args:
+            batch: Dictionary containing input_ids and attention_mask.
+            ids: Optional sequence identifiers.
+            
+        Returns:
+            EmbeddingOutput with embeddings array of shape (batch_size, hidden_size).
+        """
         with torch.no_grad():
-            output = self.model(
-                batch,
-                return_hidden_states=True
-            )
+            output = self.model(batch, return_hidden_states=True)
             embeddings = output.all_hidden_states[-1]
             if embeddings.dtype != torch.float:
                 embeddings = embeddings.float()
-            embeddings = embeddings[:, 0, :] # [CLS] token
-            embeddings = embeddings.cpu().numpy()
+            embeddings = embeddings[:, 0, :].cpu().numpy()
         return EmbeddingOutput(embeddings=embeddings, ids=ids)
     
     def predict_fitness(self, batch, ids=None) -> Dict[str, np.ndarray]:
         """
-        Predicts a fitness score for each sequence in the batch.
-        The fitness score is defined as the average log-likelihood of the sequence.
+        Compute sequence fitness as mean log-likelihood of tokens.
+        
+        Uses parallel scoring (all positions evaluated simultaneously).
+        
+        Args:
+            batch: Dictionary containing INPUT_IDS field.
+            ids: Optional sequence identifiers.
+            
+        Returns:
+            FitnessPredictionOutput with fitness scores.
         """
+        if MetadataFields.INPUT_IDS not in batch:
+            raise ValueError(f"Batch missing required field: {MetadataFields.INPUT_IDS}")
+        
         with torch.no_grad():
-            output = self.model(
-                batch
-            )
+            output = self.model(batch)
             preds = output.logits
             if preds.dtype != torch.float:
                 preds = preds.float()
             
-            # Get log-probabilities for all tokens in the vocabulary.
-            log_probs = torch.nn.functional.log_softmax(preds, dim=-1)  
-            # Gather the log-probabilities of the input tokens.
+            log_probs = torch.nn.functional.log_softmax(preds, dim=-1)
             selected_log_probs = log_probs.gather(-1, batch[MetadataFields.INPUT_IDS].unsqueeze(-1)).squeeze(-1)
-            # Create a mask to exclude padding tokens from the calculation.
-            non_padding_mask = batch[MetadataFields.INPUT_IDS] != self.tokenizer.pad_token_id  
-            # Apply the mask to zero out log-probabilities of padding tokens.
+            non_padding_mask = batch[MetadataFields.INPUT_IDS] != self.tokenizer.pad_token_id
             masked_log_probs = selected_log_probs * non_padding_mask
-            # Sum the log-likelihoods for each sequence, ignoring padding.
             log_likelihoods_sum = masked_log_probs.sum(dim=-1)
-            # Count the number of non-padding tokens in each sequence.
-            non_padding_counts = non_padding_mask.sum(dim=-1)
-            # Compute the mean log-likelihood per sequence.
+            non_padding_counts = non_padding_mask.sum(dim=-1).clamp(min=1)
             log_likelihoods_mean = (log_likelihoods_sum / non_padding_counts).cpu().numpy()
         return FitnessPredictionOutput(fitness=log_likelihoods_mean, ids=ids)
 
     def predict_downstream(self, batch, ids=None) -> DownstreamPredictionOutput:
-        """
-        Predicts using the downstream cross-attention head (classification or regression).
-        This works with models that have use_downstream_head=True.
-        """
+        """Predict using cross-attention head (requires use_downstream_head=True)."""
         with torch.no_grad():
-            # Check if model has downstream heads
             if not hasattr(self.model.model, 'cross_attention_head') or not hasattr(self.model.model, 'cross_attention_input_proj'):
                 raise ValueError("Model does not have downstream cross-attention heads. Ensure the model was trained with use_downstream_head=True.")
             
-            # Get the base model output (hidden states)
+            if MetadataFields.ATTENTION_MASK not in batch:
+                raise ValueError(f"Batch missing required field: {MetadataFields.ATTENTION_MASK}")
+            
             output = self.model(batch)
-            hidden_states = output.last_hidden_state  # [batch_size, seq_len, hidden_size]
-            attention_mask = batch[MetadataFields.ATTENTION_MASK]  # [batch_size, seq_len]
+            hidden_states = output.last_hidden_state
+            attention_mask = batch[MetadataFields.ATTENTION_MASK]
             
-            # Project hidden states to cross-attention dimension
-            projected_states = self.model.model.cross_attention_input_proj(hidden_states)  # [batch_size, seq_len, cross_attn_hidden_dim]
-            
-            # Extract [CLS] token as query and use full sequence as key/value
-            query_input = projected_states[:, 0, :]  # [batch_size, cross_attn_hidden_dim]
-            key_value_input = projected_states  # [batch_size, seq_len, cross_attn_hidden_dim]
-            
-            # Pass through cross-attention head
+            projected_states = self.model.model.cross_attention_input_proj(hidden_states)
+            query_input = projected_states[:, 0, :]
+            key_value_input = projected_states
             preds = self.model.model.cross_attention_head(query_input, key_value_input, attention_mask)
             
-            # Determine task type based on model configuration
             loss_type = getattr(self.model.hparams, 'loss_type', 'regression')
             
             if loss_type == "classification":
-                # Classification: preds shape [batch_size, num_classes]
-                preds = preds.float().cpu().numpy()
-                
-                # Get probabilities (softmax) and predicted classes
-                probabilities = torch.nn.functional.softmax(torch.from_numpy(preds), dim=-1).numpy()
-                predicted_classes = np.argmax(preds, axis=-1)
+                preds_float = preds.float()
+                probabilities = torch.nn.functional.softmax(preds_float, dim=-1).cpu().numpy()
+                predicted_classes = preds_float.argmax(dim=-1).cpu().numpy()
+                preds_np = preds_float.cpu().numpy()
                 
                 return DownstreamPredictionOutput(
-                    predictions=preds,
+                    predictions=preds_np,
                     probabilities=probabilities,
                     predicted_classes=predicted_classes,
                     ids=ids
                 )
             else:
-                # Regression: preds shape [batch_size, 1] -> squeeze to [batch_size]
                 preds = preds.squeeze(-1).float().cpu().numpy()
-                
-                return DownstreamPredictionOutput(
-                    predictions=preds,
-                    ids=ids
-                )
+                return DownstreamPredictionOutput(predictions=preds, ids=ids)
 
     def _predict_step(self, batch, batch_idx):
-        """A single prediction step that dispatches to the correct prediction function
-        based on the task type.
-        """
-        # - remove id column from batch if present
-        #  (this is needed for the model forward to work correctly)
+        """Dispatch to appropriate prediction method based on task type."""
         ids = None
         if MetadataFields.ID in batch:
             ids = batch[MetadataFields.ID]
             del batch[MetadataFields.ID]
-        # - set predict function based on task type
+        
         if self.task_type == TaskTypes.MUTATION_PREDICTION:
             predict = self.predict_mutation
         elif self.task_type == TaskTypes.MASKED_LANGUAGE_MODELING:

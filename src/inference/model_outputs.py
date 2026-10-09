@@ -72,12 +72,12 @@ class DownstreamPredictionOutput:
     """Output for downstream task predictions (classification or regression).
 
     Attributes:
-        predictions: Raw predictions from the downstream head.
-        probabilities: Class probabilities for classification tasks.
-        predicted_classes: Argmax class indices for classification tasks.
+        predictions: Raw predictions from downstream head.
+        probabilities: Optional probabilities for classification tasks (softmax applied).
+        predicted_classes: Optional predicted classes for classification tasks (argmax of logits).
         ids: Optional identifiers per prediction.
     """
-    predictions: np.ndarray
-    probabilities: np.ndarray = None
-    predicted_classes: np.ndarray = None
+    predictions: np.ndarray  # Raw predictions from downstream head
+    probabilities: np.ndarray = None  # For classification tasks (softmax applied)
+    predicted_classes: np.ndarray = None  # For classification tasks (argmax of logits)
     ids: np.ndarray = None
