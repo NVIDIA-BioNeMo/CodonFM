@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 # ----------------- Configuration -----------------
 # Default paths for data and checkpoints.
@@ -31,39 +31,34 @@ CONTAINER_NAME="codon-fm-dev-container"
 
 echo "Building the development docker image..."
 # Build the development image using the 'development' stage in the Dockerfile
-docker build -t ${IMAGE_NAME} \
+docker build -t "${IMAGE_NAME}" \
   --target development \
-  --build-arg USERNAME=$(whoami) \
-  --build-arg USER_UID=$(id -u) \
-  --build-arg USER_GID=$(id -g) \
+  --build-arg USERNAME="$(whoami)" \
+  --build-arg USER_UID="$(id -u)" \
+  --build-arg USER_GID="$(id -g)" \
   -f Dockerfile .
 
 # Check if a container with the same name is already running and stop it
-if [ "$(docker ps -q -f name=${CONTAINER_NAME})" ]; then
+if [ "$(docker ps -q -f name="^/${CONTAINER_NAME}$")" ]; then
     echo "Stopping and removing existing container..."
-    docker stop ${CONTAINER_NAME}
-    docker rm ${CONTAINER_NAME}
+    docker stop "${CONTAINER_NAME}"
+    docker rm "${CONTAINER_NAME}"
 fi
 
 echo "Launching the development container with the following mounts:"
 echo "  - Host: $(pwd) -> Container: /workspace"
 echo "  - Host: ${DATA_DIR} -> Container: /data"
 echo "  - Host: ${CHECKPOINTS_DIR} -> Container: /data/checkpoints"
-echo "  - Host: ~/.ssh -> Container: /home/$(whoami)/.ssh (read-only)"
 
-# Launch the container with GPU support, mounting volumes, and exposing port 8888
+# Launch with isolated container networking and IPC. A larger shared-memory allocation
+# supports PyTorch data loading without joining the host IPC namespace.
 docker run -it --rm \
   --gpus all \
-  --ipc=host \
-  --net=host \
-  --hostname localhost \
-  -v $(pwd):/workspace \
+  --shm-size=16g \
+  -v "$(pwd)":/workspace \
   -v "${DATA_DIR}":/data \
   -v "${CHECKPOINTS_DIR}":/data/checkpoints \
-  -v /etc/group:/etc/group:ro \
-  -v /run/sshd:/run/sshd \
-  -v ~/.ssh:/home/$(whoami)/.ssh:ro \
   -p 8888:8888 \
-  --name ${CONTAINER_NAME} \
-  ${IMAGE_NAME} \
-  bash 
+  --name "${CONTAINER_NAME}" \
+  "${IMAGE_NAME}" \
+  bash

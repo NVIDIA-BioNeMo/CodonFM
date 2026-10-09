@@ -1,0 +1,121 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codon-fm"
+version = "1.1"
+description = "Foundation models for codon sequences"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+dependencies = [
+    # - pytorch
+    "torch>=2.10",
+    "lightning==2.6.6",
+    "torchmetrics==1.9.0",
+    # - loggers
+    "wandb==0.30.0",
+    # - runtime
+    "rich==15.0.0",
+    "transformers==5.19.0",
+    "safetensors==0.8.0",
+    "python-dotenv==1.2.4",
+    "numpy==2.5.3",
+    "pandas==3.0.6",
+    "polars==2.0.0",
+    "tqdm==4.70.1",
+    "xformers==0.0.35",
+    "einops==0.8.2",
+    "peft==0.21.2",
+    "fiddle==0.3.0",
+    # - notebook execution and kernels
+    "jupyterlab==4.6.4",
+    "nbconvert==7.17.1",
+    "ipykernel==7.4.0",
+    # - analysis and data formats
+    "datasets==5.1.0",
+    "fsspec==2026.7.0",
+    "pygments==2.21.0",
+    "seaborn==0.13.2",
+    "scanpy==1.12.4",
+    # Transitive via scanpy; pinned so the image upgrades its numba 0.64.0,
+    # which requires numpy<2.5.
+    "numba==0.68.0",
+    "pyfaidx==0.9.0.4",
+    "biopython==1.88",
+    "pybigwig==0.3.26",
+    "setuptools==83.0.0",
+    "protobuf==7.36.2",
+    "grpcio-tools==1.84.0",
+    # - testing
+    "pytest==9.1.1",
+]
+
+[project.scripts]
+codon-fm = "src.runner:main"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.codonfm.ngc]
+# ABI-matched packages for the pinned nvcr.io/nvidia/pytorch:26.09-py3 image.
+# Docker converts these into pip constraints during the image build.
+constraints = [
+    "torch==2.14.0a0+b2c75dd062.nv26.9.68203377",
+    "torchvision==0.29.0a0+0fba2e84.nv26.9.68203377",
+    "xformers==0.0.35",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+managed = true
+# Lock for the supported runtime only (NGC pytorch:26.09 image: Linux, Python 3.12).
+environments = ["sys_platform == 'linux' and python_full_version >= '3.12' and python_full_version < '3.13'"]
+# Match the NGC image: torch is the public release equivalent of the NGC build above
+# (not on any package index); the CUDA bindings are the preinstalled versions, and
+# the packaging bound comes from the preinstalled nvidia-dali.
+constraint-dependencies = [
+    "torch==2.14.0",
+    "packaging<=26.2",
+    "cuda-bindings==13.4.1",
+    "cuda-pathfinder==1.8.1",
+    # Indirect dependencies preinstalled in the image. pip keeps these versions
+    # because they satisfy the requested ranges, so the lock records them too.
+    "aiohttp==3.14.3",
+    "charset-normalizer==3.5.1",
+    "filelock==3.32.7",
+    "fonttools==4.65.0",
+    "fqdn==1.5.1",
+    "googleapis-common-protos==1.75.3",
+    "hf-xet==1.6.0",
+    "huggingface-hub==1.32.0",
+    "idna==3.19",
+    "json5==0.15.0",
+    "jsonpointer==3.1.1",
+    "jupyter-builder==1.2.2",
+    "markupsafe==3.0.3",
+    "nest-asyncio2==1.7.2",
+    "networkx==3.6.1",
+    "opentelemetry-api==1.44.0",
+    "opentelemetry-exporter-otlp-proto-common==1.44.0",
+    "opentelemetry-exporter-otlp-proto-http==1.44.0",
+    "opentelemetry-proto==1.44.0",
+    "opentelemetry-sdk==1.44.0",
+    "opentelemetry-semantic-conventions==0.65b0",
+    "platformdirs==4.11.8",
+    "pycparser==3.0",
+    "pydantic==2.13.5",
+    "pydantic-core==2.46.5",
+    "pyparsing==3.3.2",
+    "regex==2026.9.10",
+    "rpds-py==2026.6.3",
+    "six==1.16.0",
+    "soupsieve==2.9.2",
+    "tzdata==2026.4",
+    "wcwidth==0.8.3",
+    # Installed by the image's OS package manager (Debian), not pip.
+    "pyyaml==6.0.1",
+]
