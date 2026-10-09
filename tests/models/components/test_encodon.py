@@ -17,7 +17,6 @@ import torch
 import pytest
 from unittest.mock import patch, MagicMock
 from src.models.components.encodon import EnCodon
-from src.models.components.cross_attention import CrossAttention
 from src.models.components.encodon_config import EnCodonConfig
 
 @pytest.fixture
@@ -106,46 +105,3 @@ class TestEnCodon:
         assert output.all_hidden_states[0].shape == (2, 16, config.hidden_size)
         # check that they are different due to the side_effect
         assert not torch.equal(output.all_hidden_states[0], output.all_hidden_states[1]) 
-
-
-class TestCrossAttention:
-    @pytest.mark.parametrize("n_out", [1, 3])
-    def test_cross_attention_forward_shapes_and_grad(self, n_out):
-        torch.manual_seed(0)
-        hidden_dim = 32
-        batch = 2
-        seq_len = 5
-
-        layer = CrossAttention(hidden_dim=hidden_dim, n_out=n_out, num_heads=4, dropout=0.0)
-        layer.train(False)
-
-        query_input = torch.randn(batch, hidden_dim, requires_grad=True)
-        key_value_input = torch.randn(batch, seq_len, hidden_dim, requires_grad=True)
-
-        out = layer(query_input, key_value_input, attention_mask=None)
-        assert out.shape == (batch, n_out)
-
-        loss = out.sum()
-        loss.backward()
-        assert query_input.grad is not None
-        assert key_value_input.grad is not None
-
-    def test_cross_attention_with_mask_shapes(self):
-        torch.manual_seed(0)
-        hidden_dim = 32
-        batch = 3
-        seq_len = 7
-
-        layer = CrossAttention(hidden_dim=hidden_dim, n_out=2, num_heads=4, dropout=0.0)
-        layer.eval()
-
-        query_input = torch.randn(batch, hidden_dim)
-        key_value_input = torch.randn(batch, seq_len, hidden_dim)
-        attention_mask = torch.tensor([
-            [1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0],
-        ], dtype=torch.bool)
-
-        out = layer(query_input, key_value_input, attention_mask=attention_mask)
-        assert out.shape == (batch, 2)

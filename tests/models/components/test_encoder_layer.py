@@ -16,7 +16,7 @@
 import torch
 import pytest
 from unittest.mock import patch
-from src.models.components.encodon_layer import EncoderLayer
+from src.models.components.encoder_layer import EncoderLayer
 from src.models.components.encodon_config import EnCodonConfig
 
 @pytest.fixture(scope="module")
@@ -86,4 +86,4 @@ class TestEncoderLayer:
         ff_hidden_states = encoder_layer.ffn_dropout(ff_hidden_states)
         
         layer_output = ff_hidden_states + ffn_input
-        assert layer_output.shape == ffn_input.shape 
+        assert layer_output.shape == ffn_input.shape

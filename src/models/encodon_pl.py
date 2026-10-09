@@ -45,7 +45,7 @@ from src.models.utils import construct_pretrained_config, get_decay_parameter_na
 
 
 class EncodonPL(LightningModule):
-    """LightningModule wrapper around the EnCodon encoder and optional heads.
+    """LightningModule wrapper around the Encodon encoder and optional heads.
 
     Supports language modeling and an optional downstream cross-attention head
     for classification or regression. Optimizer and scheduler are provided via
@@ -152,7 +152,7 @@ class EncodonPL(LightningModule):
     def configure_model(self, state_dict: Optional[Dict[str, Any]] = None) -> None:
         """Configure the underlying model and optionally load weights.
 
-        Sets up the base EnCodon model, attaches optional downstream heads, and
+        Sets up the base Encodon model, attaches optional downstream heads, and
         applies PEFT (LoRA) when enabled. Loads weights from ``state_dict`` if
         provided.
 

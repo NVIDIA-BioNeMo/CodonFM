@@ -18,7 +18,6 @@ from torch import nn
 from einops import rearrange
 
 import xformers.ops as xops
-from transformers.pytorch_utils import Conv1D
 
 from src.models.components.rotary_embedding import RotaryEmbedding, apply_rotary_pos_emb
 

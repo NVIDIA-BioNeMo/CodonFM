@@ -14,9 +14,9 @@
 # limitations under the License.
 
 class EnCodonConfig:
-    """Configuration class for EnCodon model.
+    """Configuration class for Encodon model.
     
-    This class handles the configuration for the EnCodon model, including model architecture
+    This class handles the configuration for the Encodon model, including model architecture
     parameters and training settings.
     """
     

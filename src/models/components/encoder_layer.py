@@ -18,14 +18,13 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn import Module
-from transformers.modeling_utils import apply_chunking_to_forward
 from transformers.activations import ACT2FN
 
 from .mha import MultiHeadAttention
 
 class EncoderLayer(nn.Module):
     """
-    EnCodon Encoder layer module.
+    Encodon Encoder layer module.
     This module contains a multi-head attention layer followed by a position-wise feed-forward layer.
     The architecture uses a non-standard dual LayerNorm setup: one before the main transformation
     (attention/FFN) and another one within the sub-layer, before the residual connection.

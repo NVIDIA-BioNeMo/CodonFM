@@ -24,13 +24,13 @@ import torch.nn as nn
 from torch.nn import Module
 
 from .codon_embedding import CodonEmbedding
-from .encodon_layer import EncoderLayer
+from .encoder_layer import EncoderLayer
 
 
 @dataclass
 class EnCodonOutput:
     """
-    Base class for EnCodon model's outputs.
+    Base class for Encodon model's outputs.
     """
     logits: torch.FloatTensor = None
     last_hidden_state: Optional[torch.FloatTensor] = None
@@ -39,14 +39,14 @@ class EnCodonOutput:
 
 class EnCodon(nn.Module):
     """
-    EnCodon is a transformer-based model for encoding codon sequences.
+    Encodon is a transformer-based model for encoding codon sequences.
 
     It consists of a codon embedding layer, a stack of transformer encoder layers,
     and a prediction head.
     """
     def __init__(self, config):
         """
-        Initializes the EnCodon model.
+        Initializes the Encodon model.
 
         Args:
             config: A configuration object containing model hyperparameters.
@@ -150,7 +150,7 @@ class EnCodon(nn.Module):
         **kwargs
     ) -> EnCodonOutput:
         """
-        Performs the forward pass of the EnCodon model.
+        Performs the forward pass of the Encodon model.
 
         Args:
             input_ids: Tensor of input token ids. Shape (batch_size, sequence_length).
