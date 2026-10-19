@@ -139,4 +139,3 @@ class CodonBertDataset(Dataset):
             ref_seq_col=self.ref_seq_col,
             split_name=SplitNames.ALL
         )
-        

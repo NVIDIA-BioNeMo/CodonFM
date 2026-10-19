@@ -325,12 +325,12 @@ def get_model_config(args: Any) -> fdl.Config:
             **extra_kwargs,
         )
     elif args.mode == TrainerModes.PREDICT:
-        
+
         config_kwargs = {
             "model_path": args.checkpoint_path,
             "task_type": args.task_type,
         }
-        
+
         return fdl.Config(
             EncodonInference,
             **config_kwargs
@@ -377,22 +377,22 @@ def get_trainer_config(args: Any) -> Dict[str, Any]:
 
 def create_strategy_from_config(trainer_kwargs: Dict[str, Any]) -> Any:
     """Creates the strategy object from trainer configuration.
-    
+
     This function is called at task execution time to instantiate the strategy
     from the serializable configuration parameters.
     """
     strategy_type = trainer_kwargs.pop("_strategy_type", "ddp")
     fsdp_config = trainer_kwargs.pop("_fsdp_config", None)
-    
-    if strategy_type == "fsdp" and fsdp_config:        
+
+    if strategy_type == "fsdp" and fsdp_config:
         # Convert class names to actual class objects
         transformer_layer_cls_names = fsdp_config["transformer_layer_cls_names"]
         transformer_layer_cls = set()
         for cls_name in transformer_layer_cls_names:
             if cls_name == "EncoderLayer":
                 transformer_layer_cls.add(EncoderLayer)
-        
-        
+
+
         strategy = FSDPStrategy(
             auto_wrap_policy=functools.partial(
                 transformer_auto_wrap_policy,
@@ -404,7 +404,7 @@ def create_strategy_from_config(trainer_kwargs: Dict[str, Any]) -> Any:
         )
     else:
         strategy = strategy_type
-    
+
     trainer_kwargs["strategy"] = strategy
     return trainer_kwargs
 
@@ -424,4 +424,4 @@ def get_config(args: Any) -> fdl.Config:
     cfg.trainer = get_trainer_config(args)
     cfg.callbacks = get_callbacks_config(args)
     cfg.log = get_logger_config(args)
-    return cfg 
+    return cfg

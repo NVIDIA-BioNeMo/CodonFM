@@ -14,4 +14,3 @@
 # limitations under the License.
 
 # Inference module tests
-

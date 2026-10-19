@@ -291,7 +291,7 @@ class CodonMemmapDataset(torch.utils.data.Dataset):
         dataset_copy.set_split(SplitNames.TEST)
         dataset_copy.process_item = process_item
         return dataset_copy
-    
+
     def get_predict(self, process_item: Callable) -> "CodonMemmapDataset":
         dataset_copy = CodonMemmapDataset.__new__(CodonMemmapDataset)
         dataset_copy.__dict__ = {**self.__dict__}

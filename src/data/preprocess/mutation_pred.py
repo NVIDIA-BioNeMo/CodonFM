@@ -68,7 +68,7 @@ def mlm_process_item(ref_seq, codon_position, ref_codon, alt_codon, context_leng
     }
 
 
-def likelihood_process_item(ref_seq, codon_position, ref_codon, alt_codon, context_length, tokenizer):    
+def likelihood_process_item(ref_seq, codon_position, ref_codon, alt_codon, context_length, tokenizer):
     input_sequence_toks, _, _, attention_mask, _ = _construct_sentence(ref_seq, 
                                                                        codon_position, 
                                                                        ref_codon, 

@@ -351,34 +351,34 @@ def test_two_epoch_dataloader_calls(datamodule):
 def test_distributed_indices(datamodule):
     """Test indexing behavior in a distributed setting."""
     import torch.distributed as dist
-    
+
     # FIXME: this test takes a very long time to run
-    
+
     # If CUDA available, ensure device 0 is used for this rank
     if torch.cuda.is_available():
         torch.cuda.set_device(0)
-    
+
     try:
         datamodule.world_size = 2
         datamodule.setup('fit')
         train_loader = datamodule.train_dataloader()
-        
+
         # Collect indices from this rank
         rank_indices = []
         for batch in train_loader:
             rank_indices.extend(batch['indices'].tolist())
             assert len(batch['indices'].tolist()) == datamodule.train_batch_size
 
-        
+
         # In distributed mode, each rank gets half of the dataset
         # Since drop_last=True, we'll get complete batches up to half the dataset size
-        expected_samples_per_rank = ((datamodule.dataset.train_size // 2) // 
+        expected_samples_per_rank = ((datamodule.dataset.train_size // 2) //
                                    datamodule.train_batch_size * datamodule.train_batch_size)
         assert len(rank_indices) == expected_samples_per_rank
-        
+
         # Verify indices are within bounds
         assert all(0 <= idx < datamodule.dataset.train_size for idx in rank_indices)
-    
+
     finally:
         if dist.is_initialized():
             dist.destroy_process_group()

@@ -39,7 +39,7 @@ class TestTaskTypes:
             "EMBEDDING_PREDICTION",
             "DOWNSTREAM_PREDICTION",
         ]
-        
+
         for type_name in expected_types:
             assert hasattr(TaskTypes, type_name)
 
@@ -57,7 +57,7 @@ class TestTaskTypes:
         task = TaskTypes.MUTATION_PREDICTION
         # The value is the string representation for comparisons
         assert task.value == "mutation_prediction"
-        
+
         # Should be usable in string comparisons (via value)
         assert task == "mutation_prediction"
 
@@ -65,7 +65,7 @@ class TestTaskTypes:
         """Test creating TaskTypes from string values."""
         task = TaskTypes("mutation_prediction")
         assert task == TaskTypes.MUTATION_PREDICTION
-        
+
         task = TaskTypes("fitness_prediction")
         assert task == TaskTypes.FITNESS_PREDICTION
 
@@ -79,21 +79,21 @@ class TestTaskTypes:
         task1 = TaskTypes.FITNESS_PREDICTION
         task2 = TaskTypes.FITNESS_PREDICTION
         task3 = TaskTypes.EMBEDDING_PREDICTION
-        
+
         assert task1 == task2
         assert task1 != task3
 
     def test_task_type_membership(self):
         """Test membership checks."""
         all_tasks = list(TaskTypes)
-        
+
         assert TaskTypes.MUTATION_PREDICTION in all_tasks
         assert len(all_tasks) == 5
 
     def test_task_type_iteration(self):
         """Test iterating over TaskTypes."""
         task_values = [t.value for t in TaskTypes]
-        
+
         assert "mutation_prediction" in task_values
         assert "fitness_prediction" in task_values
 
@@ -103,21 +103,21 @@ class TestTaskTypes:
             TaskTypes.FITNESS_PREDICTION: "fitness_handler",
             TaskTypes.EMBEDDING_PREDICTION: "embedding_handler",
         }
-        
+
         assert task_dict[TaskTypes.FITNESS_PREDICTION] == "fitness_handler"
         assert task_dict[TaskTypes.EMBEDDING_PREDICTION] == "embedding_handler"
 
     def test_task_type_in_conditionals(self):
         """Test using TaskTypes in conditional logic."""
         task = TaskTypes.MUTATION_PREDICTION
-        
+
         if task == TaskTypes.MUTATION_PREDICTION:
             result = "mutation"
         elif task == TaskTypes.FITNESS_PREDICTION:
             result = "fitness"
         else:
             result = "other"
-        
+
         assert result == "mutation"
 
 
@@ -133,37 +133,37 @@ class TestTaskTypesUsagePatterns:
             TaskTypes.EMBEDDING_PREDICTION: lambda: "extract_embeddings",
             TaskTypes.DOWNSTREAM_PREDICTION: lambda: "predict_downstream",
         }
-        
+
         task = TaskTypes.FITNESS_PREDICTION
         handler = handlers.get(task)
-        
+
         assert handler is not None
         assert handler() == "predict_fitness"
 
     def test_match_from_string_input(self):
         """Test matching task type from string input (common CLI pattern)."""
         user_input = "fitness_prediction"
-        
+
         try:
             task = TaskTypes(user_input)
             matched = True
         except ValueError:
             matched = False
-        
+
         assert matched
         assert task == TaskTypes.FITNESS_PREDICTION
 
     def test_validation_pattern(self):
         """Test validation pattern for task types."""
         valid_tasks = {"fitness_prediction", "mutation_prediction", "embedding_prediction"}
-        
+
         def validate_task(task_str: str) -> bool:
             try:
                 task = TaskTypes(task_str)
                 return task.value in valid_tasks
             except ValueError:
                 return False
-        
+
         assert validate_task("fitness_prediction") is True
         assert validate_task("mutation_prediction") is True
         assert validate_task("invalid_task") is False

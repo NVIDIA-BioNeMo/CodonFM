@@ -205,7 +205,7 @@ class MutationDataset(torch.utils.data.Dataset):
         copy.process_item = process_item
         copy.idxs = self.test_idx
         return copy
-    
+
     def get_predict(self, process_item):
         """modifies indices to correspond to `all` split"""
         copy = self.copy()

@@ -637,4 +637,4 @@ def test_model_combinations(base_config, sample_batch, sample_regression_batch, 
             assert not hasattr(model.model, 'cross_attention_head'), "Downstream head should not be present"
             
     except Exception as e:
-        pytest.fail(f"Model combination failed: loss_type={loss_type}, use_downstream_head={use_downstream_head}, finetune_strategy={finetune_strategy}. Error: {e}") 
+        pytest.fail(f"Model combination failed: loss_type={loss_type}, use_downstream_head={use_downstream_head}, finetune_strategy={finetune_strategy}. Error: {e}")

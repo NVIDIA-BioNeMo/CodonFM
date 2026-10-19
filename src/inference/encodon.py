@@ -38,7 +38,7 @@ from src.utils.checkpoints import load_trusted_checkpoint
 
 class EncodonInference(BaseInference):
     """Inference class for Encodon models."""
-    
+
     def configure_model(self):
         """Loads the model and tokenizer for inference."""
         if self.model is not None:
@@ -126,11 +126,11 @@ class EncodonInference(BaseInference):
     def predict_mlm(self, batch, ids=None) -> Dict[str, np.ndarray]:
         """
         Predict masked tokens in a batch.
-        
+
         Args:
             batch: Dictionary with INPUT_MASK and LABELS fields.
             ids: Optional sequence identifiers.
-            
+
         Returns:
             MaskedLMOutput with predictions and labels at masked positions.
         """
@@ -138,7 +138,7 @@ class EncodonInference(BaseInference):
             raise ValueError(f"Batch missing required field: {MetadataFields.INPUT_MASK}")
         if MetadataFields.LABELS not in batch:
             raise ValueError(f"Batch missing required field: {MetadataFields.LABELS}")
-        
+
         with torch.no_grad():
             output = self.model(batch)
             preds = output.logits
@@ -156,11 +156,11 @@ class EncodonInference(BaseInference):
     def predict_mutation(self, batch, ids=None) -> Dict[str, np.ndarray]:
         """
         Score variants by comparing log probabilities at the mutation position.
-        
+
         Args:
             batch: Dictionary with REF_CODON_TOKS, ALT_CODON_TOKS, MUTATION_TOKEN_IDX.
             ids: Optional sequence identifiers.
-            
+
         Returns:
             MutationPredictionOutput with ref/alt likelihoods and ratios.
         """
@@ -172,7 +172,7 @@ class EncodonInference(BaseInference):
         for field in required_fields:
             if field not in batch:
                 raise ValueError(f"Batch missing required field for mutation prediction: {field}")
-        
+
         with torch.no_grad():
             output = self.model(batch)
             preds = output.logits
@@ -181,7 +181,7 @@ class EncodonInference(BaseInference):
             ref_toks = batch[MetadataFields.REF_CODON_TOKS].view(-1)
             alt_toks = batch[MetadataFields.ALT_CODON_TOKS].view(-1)
             mutation_token_idx = batch[MetadataFields.MUTATION_TOKEN_IDX].view(-1)
-            
+
             seq_len = preds.shape[1]
             if (mutation_token_idx >= seq_len).any() or (mutation_token_idx < 0).any():
                 raise ValueError(
@@ -189,7 +189,7 @@ class EncodonInference(BaseInference):
                     f"Valid range: [0, {seq_len-1}], got min={mutation_token_idx.min().item()}, "
                     f"max={mutation_token_idx.max().item()}"
                 )
-            
+
             batch_indices = torch.arange(preds.shape[0], device=preds.device)
             preds = preds[batch_indices, mutation_token_idx, :]
             preds = torch.nn.functional.log_softmax(preds, dim=-1)
@@ -206,11 +206,11 @@ class EncodonInference(BaseInference):
     def extract_embeddings(self, batch, ids=None) -> Dict[str, np.ndarray]:
         """
         Extract sequence embeddings from the [CLS] token.
-        
+
         Args:
             batch: Dictionary containing input_ids and attention_mask.
             ids: Optional sequence identifiers.
-            
+
         Returns:
             EmbeddingOutput with embeddings array of shape (batch_size, hidden_size).
         """
@@ -225,19 +225,19 @@ class EncodonInference(BaseInference):
     def predict_fitness(self, batch, ids=None) -> Dict[str, np.ndarray]:
         """
         Compute sequence fitness as mean log-likelihood of tokens.
-        
+
         Uses parallel scoring (all positions evaluated simultaneously).
-        
+
         Args:
             batch: Dictionary containing INPUT_IDS field.
             ids: Optional sequence identifiers.
-            
+
         Returns:
             FitnessPredictionOutput with fitness scores.
         """
         if MetadataFields.INPUT_IDS not in batch:
             raise ValueError(f"Batch missing required field: {MetadataFields.INPUT_IDS}")
-        
+
         with torch.no_grad():
             output = self.model(batch)
             preds = output.logits
@@ -295,7 +295,7 @@ class EncodonInference(BaseInference):
         if MetadataFields.ID in batch:
             ids = batch[MetadataFields.ID]
             del batch[MetadataFields.ID]
-        
+
         if self.task_type == TaskTypes.MUTATION_PREDICTION:
             predict = self.predict_mutation
         elif self.task_type == TaskTypes.MASKED_LANGUAGE_MODELING:

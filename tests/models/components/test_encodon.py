@@ -104,4 +104,4 @@ class TestEnCodon:
         assert len(output.all_hidden_states) == config.num_hidden_layers
         assert output.all_hidden_states[0].shape == (2, 16, config.hidden_size)
         # check that they are different due to the side_effect
-        assert not torch.equal(output.all_hidden_states[0], output.all_hidden_states[1]) 
+        assert not torch.equal(output.all_hidden_states[0], output.all_hidden_states[1])

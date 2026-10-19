@@ -152,4 +152,4 @@ class TestTokenizer:
         # _tokenize("AR") -> ['A', 'R']
         a_id = tokenizer.encoder_aa['A']
         r_id = tokenizer.encoder_aa['R']
-        assert encoded_aa == [a_id, r_id] 
+        assert encoded_aa == [a_id, r_id]
