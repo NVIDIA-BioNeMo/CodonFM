@@ -23,6 +23,7 @@ dependencies = [
     "python-dotenv==1.2.4",
     "numpy==2.5.3",
     "pandas==3.0.6",
+    "openpyxl==3.1.5",
     "polars==2.0.0",
     "tqdm==4.70.1",
     "xformers==0.0.35",
